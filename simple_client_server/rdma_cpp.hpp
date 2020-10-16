@@ -22,10 +22,9 @@ namespace rdma
         address_info(const char* _host, const char* _port, app_type _app_type)
             : addr_info_{}
         {
-            rdma_addrinfo hints{
-                .ai_port_space = RDMA_PS_TCP,
-                .ai_qp_type = IBV_QPT_RC
-            };
+            rdma_addrinfo hints{};
+            hints.ai_port_space = RDMA_PS_TCP;
+            hints.ai_qp_type = IBV_QPT_RC;
 
             if (app_type::server == _app_type)
                 hints.ai_flags = RAI_PASSIVE;
@@ -63,21 +62,17 @@ namespace rdma
 
         auto post_send(std::uint8_t* _buffer, std::uint32_t _buffer_size) -> void
         {
-            ibv_sge sge{
-                .addr = (std::uint64_t) (std::uintptr_t) _buffer,
-                .length = _buffer_size,
-                .lkey = 0
-            };
+            ibv_sge sge{};
+            sge.addr = (std::uint64_t) (std::uintptr_t) _buffer;
+            sge.length = _buffer_size;
+            sge.lkey = 0;
 
-            ibv_send_wr wr{
-                .wr_id = (std::uintptr_t) nullptr,
-                .next = nullptr,
-
-                .sg_list = &sge,
-                .num_sge = 1,
-
-                .opcode = IBV_WR_SEND
-            };
+            ibv_send_wr wr{};
+            wr.wr_id = (std::uintptr_t) nullptr;
+            wr.next = nullptr;
+            wr.sg_list = &sge;
+            wr.num_sge = 1;
+            wr.opcode = IBV_WR_SEN;
 
             ibv_send_wr* bad_wr{};
 
@@ -114,8 +109,10 @@ namespace rdma
             : id_{}
         {
             ibv_qp_init_attr attrs{};
-            attrs.cap.max_send_wr = attrs.cap.max_recv_wr = 1;
-            attrs.cap.max_send_sge = attrs.cap.max_recv_sge = 1;
+            attrs.cap.max_send_wr = 1;
+	    attrs.cap.max_recv_wr = 1;
+            attrs.cap.max_send_sge = 1;
+	    attrs.cap.max_recv_sge = 1;
             attrs.sq_sig_all = 1;
 
             const auto ec = rdma_create_ep(&id_, _addr_info, nullptr, &attrs);

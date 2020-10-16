@@ -24,7 +24,7 @@ namespace rdma
         {
             rdma_addrinfo hints{};
             hints.ai_port_space = RDMA_PS_TCP;
-            hints.ai_qp_type = IBV_QPT_RC;
+            //hints.ai_qp_type = IBV_QPT_RC;
 
             if (app_type::server == _app_type)
                 hints.ai_flags = RAI_PASSIVE;

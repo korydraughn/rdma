@@ -13,8 +13,14 @@
 
 auto main(int _argc, char* _argv[]) -> int
 {
+    if (_argc != 2) {
+        std::cerr << "Invalid argument count.\n"
+		     "Usage: rdma_server <port>\n";
+	return 1;
+    }
+
     const char* host = nullptr;
-    const char* port = "8900";
+    const char* port = _argv[1];
 
     try {
         rdma::address_info addr_info{host, port, rdma::app_type::server};

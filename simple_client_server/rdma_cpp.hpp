@@ -72,7 +72,7 @@ namespace rdma
             wr.next = nullptr;
             wr.sg_list = &sge;
             wr.num_sge = 1;
-            wr.opcode = IBV_WR_SEN;
+            wr.opcode = IBV_WR_SEND;
 
             ibv_send_wr* bad_wr{};
 

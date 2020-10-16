@@ -7,6 +7,7 @@
 #include <rdma/rdma_verbs.h>
 
 #include <stdexcept>
+#include <iostream>
 
 namespace rdma
 {
@@ -52,6 +53,23 @@ namespace rdma
         rdma_addrinfo* addr_info_;
     }; // class address_info
 
+    class communication_manager;
+
+    class memory_region
+    {
+    public:
+        memory_region(const communication_manager& _comm_id,
+                      const std::uint8_t* _buffer,
+                      std::uint64_t _buffer_size);
+
+        ~memory_region();
+
+        operator ibv_mr*() const noexcept;
+
+    private:
+        ibv_mr* mr_;
+    }; // class memory_region
+
     class queue_pair
     {
     public:
@@ -73,6 +91,7 @@ namespace rdma
             wr.sg_list = &sge;
             wr.num_sge = 1;
             wr.opcode = IBV_WR_SEND;
+	    //wr.send_flags = IBV_SEND_SIGNALED;
 
             ibv_send_wr* bad_wr{};
 
@@ -91,11 +110,34 @@ namespace rdma
 
             if (ec <= 0)
                 throw std::runtime_error{"queue_pair::post_send completion error."};
+
+	    std::cout << "Message sent!\n";
+        }
+
+        auto post_send(std::uint8_t* _buffer, std::uint32_t _buffer_size, const memory_region& _memory_region) -> void
+        {
+	    const int send_flags = 0;
+            auto ec = rdma_post_send(&comm_id_, nullptr, _buffer, _buffer_size, _memory_region, send_flags);
+
+            if (ec)
+                throw std::runtime_error{"queue_pair::post_send completion error."};
+
+            // Wait for send to complete.
+            ibv_wc wc{};
+
+            // This function requires that separate rdma_cm_id's must be used for
+            // sends and receive completions. This function may be bad for implementing
+            // an iRODS transport. How expensive is it to have multiple rdma_cm_id's?
+            ec = rdma_get_send_comp(&comm_id_, &wc);
+
+            if (ec <= 0)
+                throw std::runtime_error{"queue_pair::post_send completion error."};
+
+	    std::cout << "Message sent!\n";
         }
 
         auto post_receive() -> void
         {
-
         }
 
     private:
@@ -151,10 +193,7 @@ namespace rdma
         rdma_cm_id* id_;
     }; // class communication_manager
 
-    class memory_region
-    {
-    public:
-        memory_region(const communication_manager& _comm_id,
+	memory_region::memory_region(const communication_manager& _comm_id,
                       const std::uint8_t* _buffer,
                       std::uint64_t _buffer_size)
         {
@@ -164,19 +203,15 @@ namespace rdma
                 throw std::runtime_error{"memory_region construction error."};
         }
 
-        ~memory_region()
+        memory_region::~memory_region()
         {
             if (mr_)
                 rdma_dereg_mr(mr_);
         }
 
-        operator ibv_mr*() const noexcept
+	memory_region::operator ibv_mr*() const noexcept
         {
             return mr_;
         }
-
-    private:
-        ibv_mr* mr_;
-    }; // class memory_region
 } // namespace rdma
 

@@ -7,7 +7,8 @@
 
 #include <iostream>
 #include <vector>
-#include <string>
+//#include <thread>
+//#include <chrono>
 #include <exception>
 
 auto main(int _argc, char* _argv[]) -> int
@@ -29,7 +30,10 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::memory_region mem_region{comm_mgr, buffer.data(), buffer.size()};
 
         auto qp = comm_mgr.connect();
+	//using namespace std::chrono_literals;
+	//std::this_thread::sleep_for(2s);
         qp.post_send(buffer.data(), buffer.size());
+        //qp.post_send(buffer.data(), buffer.size(), mem_region);
     }
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';

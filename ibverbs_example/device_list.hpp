@@ -14,7 +14,7 @@ namespace rdma
     {
     public:
         explicit device(ibv_device& _device)
-            : device_{_device}
+            : device_{&_device}
         {
         }
 
@@ -44,8 +44,8 @@ namespace rdma
     {
     public:
         device_list()
-            , devices_{}
-            : num_devices_{}
+            : devices_{}
+            , num_devices_{}
         {
             devices_ = ibv_get_device_list(&num_devices_);
 

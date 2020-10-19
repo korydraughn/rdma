@@ -54,16 +54,16 @@ namespace rdma
         completion_queue(int _cpe_size, const context& _ctx)
             : cq_{ibv_create_cq(&_ctx.handle(), _cpe_size, nullptr, nullptr, 0)}
         {
-            if (!cq) {
+            if (!cq_) {
                 perror("ibv_create_cq");
                 throw std::runtime_error{"ibv_create_cq error"};
             }
         }
 
         completion_queue(int _cpe_size, const completion_event_channel& _evt_ch)
-            : cq_{ibv_create_cq(_evt_ch.ctx_, _cpe_size, nullptr, _evt_ch_.evt_ch_, 0)}
+            : cq_{ibv_create_cq(_evt_ch.ctx_, _cpe_size, nullptr, _evt_ch.evt_ch_, 0)}
         {
-            if (!cq) {
+            if (!cq_) {
                 perror("ibv_create_cq");
                 throw std::runtime_error{"ibv_create_cq error"};
             }
@@ -76,6 +76,11 @@ namespace rdma
         {
             if (cq_)
                 ibv_destroy_cq(cq_);
+        }
+
+        auto handle() const noexcept -> ibv_cq&
+        {
+            return *cq_;
         }
 
         auto resize(int _new_size) const -> void

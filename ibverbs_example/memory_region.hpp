@@ -20,7 +20,7 @@ namespace rdma
         memory_region(const protection_domain& _pd,
                       const std::vector<std::uint8_t>& _buffer,
                       ibv_access_flags _access)
-            : mr_{ibv_reg_mr(&_pd.handle(), _buffer.data(), _buffer.size(), _access)}
+            : mr_{ibv_reg_mr(&_pd.handle(), const_cast<std::uint8_t*>(_buffer.data()), _buffer.size(), _access)}
         {
             if (!mr_) {
                 perror("ibv_reg_mr");

@@ -6,48 +6,10 @@
 
 #include <cstdint>
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <vector>
 #include <utility>
-
-auto print_device_info(const rdma::context& _c) -> void
-{
-    const auto info = _c.device_info();
-
-    std::cout << "Device Information\n";
-    std::cout << "------------------\n";
-    std::cout << "firmware version   : " << info.fw_ver << '\n';
-    std::cout << "node guid          : " << info.node_guid << '\n';      // In network byte order
-    std::cout << "system image guid  : " << info.sys_image_guid << '\n'; // In network byte order
-    std::cout << "max mr size        : " << info.max_mr_size << '\n';
-    std::cout << "vendor id          : " << info.vendor_id << '\n';
-    std::cout << "vendor part id     : " << info.vendor_part_id << '\n';
-    std::cout << "hardware version   : " << info.hw_ver << '\n';
-    std::cout << "physical port count: " << info.phys_port_cnt << '\n';
-    std::cout << '\n';
-}
-
-auto print_port_info(const rdma::context& _c, std::uint8_t _port_number) -> void
-{
-    const auto info = _c.port_info(_port_number);
-
-    std::cout << "Port Information\n";
-    std::cout << "----------------\n";
-    std::cout << "state     : " << rdma::to_string(info.state) << '\n';
-    std::cout << "max mtu   : " << rdma::to_string(info.max_mtu) << '\n';
-    std::cout << "active mtu: " << rdma::to_string(info.active_mtu) << '\n';
-    std::cout << "lid       : " << info.lid << '\n';
-    std::cout << '\n';
-}
-
-auto print_queue_pair_info(const rdma::queue_pair_info& _qpi) -> void
-{
-    std::cout << "qp_num: " << _qpi.qp_num << '\n';
-    std::cout << "rq_psn: " << _qpi.rq_psn << '\n';
-    std::cout << "lid   : " << _qpi.lid << '\n';
-    std::cout << "gid   : " << _qpi.gid << '\n';
-    std::cout << '\n';
-}
 
 auto main(int _argc, char* _argv[]) -> int
 {
@@ -59,20 +21,25 @@ auto main(int _argc, char* _argv[]) -> int
     try {
         rdma::device_list devices;
         std::cout << "Number of RDMA devices: " << devices.size() << '\n';
+        std::cout << '\n';
 
         for (int i = 0; i < devices.size(); ++i) {
             auto d = devices[i];
             std::cout << i << ". Device - Name: " << d.name() << ", GUID: " << d.guid() << '\n';
         }
+        std::cout << '\n';
 
         rdma::context context{devices[0]};
-        print_device_info(context);
+        rdma::print_device_info(context);
+        std::cout << '\n';
 
         constexpr auto port_number = 1;
-        print_port_info(context, port_number);
+        rdma::print_port_info(context, port_number);
+        std::cout << '\n';
 
         constexpr auto pkey_index = 0;
-        std::cout << "\npkey: " << context.pkey(port_number, pkey_index) << '\n';
+        std::cout << "pkey: " << context.pkey(port_number, pkey_index) << '\n';
+        std::cout << '\n';
 
         rdma::protection_domain pd{context};
 
@@ -106,26 +73,33 @@ auto main(int _argc, char* _argv[]) -> int
         //   slide 78
 
         const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
+        static_cast<void>(q_attrs);
 
         rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();
         qp_info.rq_psn = qp_attrs.rq_psn;
         qp_info.lid = qp_attrs.ah_attr.dlid;
-        qp_info.gid = qp_attrs.ah_attr.ghr.dgid;
+        qp_info.gid = qp_attrs.ah_attr.grh.dgid;
+
         std::cout << "Client Queue Pair Info\n";
         std::cout << "----------------------\n";
-        print_queue_pair_info(qp_info);
+        rdma::print_queue_pair_info(qp_info);
+        std::cout << '\n';
 
         constexpr auto is_server = false;
         const auto* host = _argv[1];
         const auto* port = _argv[2];
         rdma::exchange_queue_pair_info(host, port, qp_info, is_server);
+
         std::cout << "Server Queue Pair Info\n";
         std::cout << "----------------------\n";
-        print_queue_pair_info(qp_info);
+        rdma::print_queue_pair_info(qp_info);
+        std::cout << '\n';
 
-        //constexpr auto access_flags = 0;
-        //rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
+        constexpr auto access_flags = 0;
+        rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
+        rdma::change_queue_pair_state_to_rtr(qp, qp_info.qp_num, qp_info.rq_psn, qp_info.lid, qp_info.gid, port_number);
+        rdma::change_queue_pair_state_to_rts(qp);
 
         // This is not necessary for initialization. Memory Regions can be registered at
         // any time following initialization.

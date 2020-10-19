@@ -1,14 +1,29 @@
 #ifndef KDD_RDMA_UTILITY_HPP
 #define KDD_RDMA_UTILITY_HPP
 
-#include "queue_pair.hpp"
+#include "verbs.hpp"
 
 #include <infiniband/verbs.h>
+
+#include <endian.h>
+#include <byteswap.h>
 
 #include <boost/asio.hpp>
 
 #include <cstdint>
+#include <iostream>
+#include <iomanip>
 #include <string>
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    inline std::uint64_t htonll(std::uint64_t _x) { return bswap_64(_x); }
+    inline std::uint64_t ntohll(std::uint64_t _x) { return bswap_64(_x); }
+#elif __BYTE_ORDER == __BIG_ENDIAN
+    inline std::uint64_t htonll(std::uint64_t _x) { return _x; }
+    inline std::uint64_t ntohll(std::uint64_t _x) { return _x; }
+#else
+    #error __BYTE_ORDER is neither __LITTLE_ENDIAN nor __BIG_ENDIAN
+#endif
 
 namespace rdma
 {
@@ -21,16 +36,16 @@ namespace rdma
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_INIT;
-        attrs.pkey_index = 0;
+        attrs.pkey_index = _pkey_index;
         attrs.port_num = _port_number;
-        attrs.qp_access_flags = 0;
+        attrs.qp_access_flags = _access_flags;
 
         const auto props = (IBV_QP_STATE |
                             IBV_QP_PKEY_INDEX |
                             IBV_QP_PORT |
                             IBV_QP_ACCESS_FLAGS);
 
-        qp.modify_attribute(attrs, props);
+        _qp.modify_attribute(attrs, props);
     }
 
     inline
@@ -61,7 +76,7 @@ namespace rdma
                             IBV_QP_DEST_QPN |
                             IBV_QP_RQ_PSN);
 
-        qp.modify_attribute(attrs, props);
+        _qp.modify_attribute(attrs, props);
     }
 
     inline
@@ -83,7 +98,7 @@ namespace rdma
                             IBV_QP_RNR_RETRY |
                             IBV_QP_TIMEOUT);
 
-        qp.modify_attribute(attrs, props);
+        _qp.modify_attribute(attrs, props);
     }
 
     struct queue_pair_info
@@ -96,21 +111,24 @@ namespace rdma
 
     inline
     auto exchange_queue_pair_info(const std::string& _host,
-                                  int _port,
+                                  const std::string& _port,
                                   queue_pair_info& _qp_info,
                                   bool _is_server) -> void
     {
         using tcp = boost::asio::ip::tcp;
 
-        if (_is_server) {
-            boost::asio::io_context io_context;
+        _qp_info.qp_num = htonl(_qp_info.qp_num);
+        _qp_info.lid = htons(_qp_info.lid);
 
-            tcp::endpoint endpoint{tcp::v4(), _port};
-            tcp::acceptor acceptor{io_context, endpoint};
+        if (_is_server) {
+            boost::asio::io_service io_service;
+
+            tcp::endpoint endpoint{tcp::v4(), std::stoi(_port)};
+            tcp::acceptor acceptor{io_service, endpoint};
 
             tcp::iostream stream;
             boost::system::error_code ec;
-            acceptor.accept(stream.socket(), ec);
+            acceptor.accept(*stream.rdbuf(), ec);
 
             if (ec) {
                 throw std::runtime_error{"connect_queue_pairs server error"};
@@ -123,20 +141,22 @@ namespace rdma
             // Send the server's queue pair information.
             stream.write((char*) &_qp_info, sizeof(queue_pair_info));
             _qp_info = client_qp_info;
+        }
+        else {
+            tcp::iostream stream{_host, _port};
 
-            return;
+            if (!stream)
+                throw std::runtime_error{"connect_queue_pairs client error"};
+
+            // Send the client's queue pair information to the server.
+            stream.write((char*) &_qp_info, sizeof(queue_pair_info));
+
+            // Capture the server's queue pair information.
+            stream.read((char*) &_qp_info, sizeof(queue_pair_info));
         }
 
-        tcp::iostream stream{_host, _port};
-
-        if (!stream)
-            throw std::runtime_error{"connect_queue_pairs client error"};
-
-        // Send the client's queue pair information to the server.
-        stream.write((char*) &_qp_info, sizeof(queue_pair_info));
-
-        // Capture the server's queue pair information.
-        stream.read((char*) &_qp_info, sizeof(queue_pair_info));
+        _qp_info.qp_num = ntohl(_qp_info.qp_num);
+        _qp_info.lid = ntohs(_qp_info.lid);
     }
 
     inline
@@ -164,6 +184,47 @@ namespace rdma
             case IBV_MTU_4096: return "IBV_MTU_4096";
             default:           return "???";
         }
+    }
+
+    auto print_device_info(const context& _c) -> void
+    {
+        const auto info = _c.device_info();
+
+        std::cout << "Device Information\n";
+        std::cout << "------------------\n";
+        std::cout << "firmware version   : " << info.fw_ver << '\n';
+        std::cout << "node guid          : " << info.node_guid << '\n';      // In network byte order
+        std::cout << "system image guid  : " << info.sys_image_guid << '\n'; // In network byte order
+        std::cout << "max mr size        : " << info.max_mr_size << '\n';
+        std::cout << "vendor id          : " << info.vendor_id << '\n';
+        std::cout << "vendor part id     : " << info.vendor_part_id << '\n';
+        std::cout << "hardware version   : " << info.hw_ver << '\n';
+        std::cout << "physical port count: " << info.phys_port_cnt << '\n';
+    }
+
+    auto print_port_info(const context& _c, std::uint8_t _port_number) -> void
+    {
+        const auto info = _c.port_info(_port_number);
+
+        std::cout << "Port Information\n";
+        std::cout << "----------------\n";
+        std::cout << "state     : " << rdma::to_string(info.state) << '\n';
+        std::cout << "max mtu   : " << rdma::to_string(info.max_mtu) << '\n';
+        std::cout << "active mtu: " << rdma::to_string(info.active_mtu) << '\n';
+        std::cout << "lid       : " << info.lid << '\n';
+    }
+
+    auto print_queue_pair_info(const queue_pair_info& _qpi) -> void
+    {
+        std::cout << "qp_num: " << _qpi.qp_num << '\n';
+        std::cout << "rq_psn: " << _qpi.rq_psn << '\n';
+        std::cout << "lid   : " << _qpi.lid << '\n';
+
+        std::cout << "gid   : 0x";
+        for (int i = 0; i < 16; ++i)
+            std::cout << std::hex << (int) _qpi.gid.raw[i];
+
+        std::cout << '\n';
     }
 } // namespace rdma
 

@@ -20,7 +20,7 @@ namespace rdma
     {
     public:
         queue_pair(const protection_domain& _pd, const ibv_qp_init_attr& _attrs)
-            : qp_{ibv_create_qp(&_pd.handle(), &_attrs)}
+            : qp_{ibv_create_qp(&_pd.handle(), const_cast<ibv_qp_init_attr*>(&_attrs))}
         {
             if (!qp_) {
                 perror("ibv_create_qp");
@@ -39,15 +39,15 @@ namespace rdma
             return qp_->qp_num;
         }
 
-        auto modify_attribute(const ibv_qp_attr& _attr, ibv_qp_attr_mask _mask) const -> void
+        auto modify_attribute(const ibv_qp_attr& _attr, int _mask) const -> void
         {
-            if (ibv_modify_qp(qp_, &_attr, _mask)) {
+            if (ibv_modify_qp(qp_, const_cast<ibv_qp_attr*>(&_attr), _mask)) {
                 perror("ibv_modify_qp");
                 throw std::invalid_argument{"ibv_modify_qp error"};
             }
         }
 
-        auto query_attribute(ibv_qp_attr_mask _mask) const -> std::tuple<ibv_qp_attr, ibv_qp_init_attr>
+        auto query_attribute(int _mask) const -> std::tuple<ibv_qp_attr, ibv_qp_init_attr>
         {
             ibv_qp_attr attrs{};
             ibv_qp_init_attr init_attrs{};
@@ -107,7 +107,7 @@ namespace rdma
             wr.sg_list = &sg_list;
             wr.num_sge = 1;
 
-            ibv_send_wr* bad_wr;
+            ibv_recv_wr* bad_wr;
 
             if (ibv_post_recv(qp_, &wr, &bad_wr)) {
                 perror("ibv_post_recv");

@@ -1,4 +1,4 @@
-#include "verbspp.hpp"
+#include "verbs.hpp"
 
 #include <infiniband/verbs.h>
 
@@ -24,11 +24,12 @@ auto print_device_info(const rdma::context& _c) -> void
     std::cout << "vendor part id     : " << info.vendor_part_id << '\n';
     std::cout << "hardware version   : " << info.hw_ver << '\n';
     std::cout << "physical port count: " << info.phys_port_cnt << '\n';
+    std::cout << '\n';
 }
 
 auto print_port_info(const rdma::context& _c, std::uint8_t _port_number) -> void
 {
-    const auto info = _c.port_info();
+    const auto info = _c.port_info(_port_number);
 
     std::cout << "Port Information\n";
     std::cout << "----------------\n";
@@ -36,6 +37,16 @@ auto print_port_info(const rdma::context& _c, std::uint8_t _port_number) -> void
     std::cout << "max mtu   : " << rdma::to_string(info.max_mtu) << '\n';
     std::cout << "active mtu: " << rdma::to_string(info.active_mtu) << '\n';
     std::cout << "lid       : " << info.lid << '\n';
+    std::cout << '\n';
+}
+
+auto print_queue_pair_info(const rdma::queue_pair_info& _qpi) -> void
+{
+    std::cout << "qp_num: " << _qpi.qp_num << '\n';
+    std::cout << "rq_psn: " << _qpi.rq_psn << '\n';
+    std::cout << "lid   : " << _qpi.lid << '\n';
+    std::cout << "gid   : " << _qpi.gid << '\n';
+    std::cout << '\n';
 }
 
 auto main(int _argc, char* _argv[]) -> int
@@ -75,9 +86,6 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::queue_pair qp{pd, qp_init_attrs};
 
-        constexpr auto access_flags = 0;
-        rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
-
         // TODO Exchange queue pair information.
         //
         // Use the Communication Manager (rdma_cm) to do this. The following information
@@ -92,20 +100,30 @@ auto main(int _argc, char* _argv[]) -> int
         // csm.ornl.gov/workshops/openshmem2014/documents/presentations_and_tutorials/Tutorials/Verbs%20programming%20tutorial-final.pdf
         //   slide 78
 
-        queue_pair_info qp_info{
-            .qpn = "",
-            .lid = "",
-            .rq_psn = "",
-            .gid = ""
-        };
+        const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
+
+        queue_pair_info qp_info{};
+        qp_info.qp_num = qp.queue_pair_number();
+        qp_info.rq_psn = qp_attrs.rq_psn;
+        qp_info.lid = qp_attrs.ah_attr.dlid;
+        qp_info.gid = qp_attrs.ah_attr.ghr.dgid;
+        std::cout << "Server Queue Pair Info\n";
+        std::cout << "----------------------\n";
+        print_queue_pair_info(qp_info);
 
         constexpr auto is_server = true;
-        rdma::connect_queue_pairs(host, port, qp_info, is_server);
+        rdma::exchange_queue_pair_info(host, port, qp_info, is_server);
+        std::cout << "Client Queue Pair Info\n";
+        std::cout << "----------------------\n";
+        print_queue_pair_info(qp_info);
+
+        //constexpr auto access_flags = 0;
+        //rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
 
         // This is not necessary for initialization. Memory Regions can be registered at
         // any time following initialization.
-        std::vector<std::uint8_t> buffer(128);
-        rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
+        //std::vector<std::uint8_t> buffer(128);
+        //rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
 
         return 0;
     }

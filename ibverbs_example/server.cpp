@@ -51,6 +51,11 @@ auto print_queue_pair_info(const rdma::queue_pair_info& _qpi) -> void
 
 auto main(int _argc, char* _argv[]) -> int
 {
+    if (_argc != 2) {
+        std::cout << "USAGE: server <port>\n";
+        return 1;
+    }
+
     try {
         rdma::device_list devices;
         std::cout << "Number of RDMA devices: " << devices.size() << '\n';
@@ -112,7 +117,8 @@ auto main(int _argc, char* _argv[]) -> int
         print_queue_pair_info(qp_info);
 
         constexpr auto is_server = true;
-        rdma::exchange_queue_pair_info(host, port, qp_info, is_server);
+        const auto* port = _argv[1];
+        rdma::exchange_queue_pair_info("", port, qp_info, is_server);
         std::cout << "Client Queue Pair Info\n";
         std::cout << "----------------------\n";
         print_queue_pair_info(qp_info);

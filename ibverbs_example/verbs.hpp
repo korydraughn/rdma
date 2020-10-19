@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include <boost/asio.hpp>
+
+#include <string>
 #include <stdexcept>
 
 namespace rdma
@@ -33,8 +36,53 @@ namespace rdma
             return *ctx_;
         }
 
-        // TODO Add functions that allow querying the device properties
-        // (e.g. device attributes, port properties, pkey, port GID).
+        auto device_info() const -> ibv_device_attr
+        {
+            ibv_device_attr attrs{};
+
+            if (ibv_query_device(ctx_, &attrs)) {
+                perror("ibv_query_device");
+                throw std::runtime_error{"ibv_query_device error"};
+            }
+
+            return attrs;
+        }
+
+        auto port_info(std::uint8_t _port_number) const -> ibv_port_attr
+        {
+            ibv_port_attr attrs{};
+
+            if (ibv_query_port(ctx_, _port_number, &attrs)) {
+                perror("ibv_query_port");
+                throw std::runtime_error{"ibv_query_port error"};
+            }
+
+            return attrs;
+        }
+
+        auto pkey(std::uint8_t _port_number, int _index) const -> std::uint16_t
+        {
+            std::uint16_t pkey;
+
+            if (ibv_query_pkey(ctx_, _port_number, _index, &pkey)) {
+                perror("ibv_query_pkey");
+                throw std::runtime_error{"ibv_query_pkey error"};
+            }
+
+            return pkey;
+        }
+
+        auto gid(std::uint8_t _port_number, int _index) const -> ibv_gid
+        {
+            ibv_gid gid;
+
+            if (ibv_query_gid(ctx_, _port_number, _index, &gid)) {
+                perror("ibv_query_gid");
+                throw std::runtime_error{"ibv_query_gid error"};
+            }
+
+            return gid;
+        }
 
     private:
         ibv_context* ctx_;
@@ -366,5 +414,94 @@ namespace rdma
         ibv_device** devices_;
         int num_devices_;
     }; // class device_list
+
+    auto change_queue_pair_state_to_init(queue_pair& _qp,
+                                         int _port_number,
+                                         int _pkey_index,
+                                         int _access_flags) -> void
+    {
+        ibv_qp_attr attrs{};
+        attrs.qp_state = IBV_QPS_INIT;
+        attrs.port_num = port_number;
+        attrs.pkey_index = 0;
+        attrs.access_flags = 0;
+
+        qp.modify_attribute(attrs, IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS);
+    }
+
+    auto change_queue_pair_state_to_rtr(queue_pair& _qp) -> void
+    {
+        ibv_qp_attr attrs{};
+        attrs.qp_state = IBV_QPS_RTR;
+
+        qp.modify_attribute(attrs, IBV_QP_STATE);
+    }
+
+    struct queue_pair_info
+    {
+        std::string qpn;
+        std::string lid;
+        std::string rq_psn;
+        std::string gid;
+    };
+
+    auto connect_queue_pairs(const std::string& _host,
+                             int _port,
+                             queue_pair_info& _qp_info,
+                             bool _is_server) -> void
+    {
+        using tcp = boost::asio::ip::tcp;
+
+        if (_is_server) {
+            boost::asio::io_context io_context;
+
+            tcp::endpoint endpoint{tcp::v4(), _port};
+            tcp::acceptor acceptor{io_context, endpoint};
+
+            tcp::iostream stream;
+            boost::system::error_code ec;
+            acceptor.accept(stream.socket(), ec);
+
+            if (ec) {
+                throw std::runtime_error{"connect_queue_pairs server error"};
+            }
+
+            stream << _qp_info;
+
+            return;
+        }
+
+        tcp::iostream stream{_host, _port};
+
+        if (!stream)
+            throw std::runtime_error{"connect_queue_pairs client error"};
+
+        stream >> _qp_info;
+    }
+
+    constexpr auto to_string(ibv_port_state _pstate) noexcept -> const char*
+    {
+        switch (_pstate) {
+            case IBV_PORT_NOP:          return "IBV_PORT_NOP";
+            case IBV_PORT_DOWN:         return "IBV_PORT_DOWN";
+            case IBV_PORT_INIT:         return "IBV_PORT_INIT";
+            case IBV_PORT_ARMED:        return "IBV_PORT_ARMED";
+            case IBV_PORT_ACTIVE:       return "IBV_PORT_ACTIVE";
+            case IBV_PORT_ACTIVE_DEFER: return "IBV_PORT_ACTIVE_DEFER";
+            default:                    return "???";
+        }
+    }
+
+    constexpr auto to_string(ibv_mtu _mtu) noexcept -> const char*
+    {
+        switch (_mtu) {
+            case IBV_MTU_256:  return "IBV_MTU_256";
+            case IBV_MTU_512:  return "IBV_MTU_512";
+            case IBV_MTU_1024: return "IBV_MTU_1024";
+            case IBV_MTU_2048: return "IBV_MTU_2048";
+            case IBV_MTU_4096: return "IBV_MTU_4096";
+            default:           return "???";
+        }
+    }
 } // namespace rdma
 

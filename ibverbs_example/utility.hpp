@@ -11,6 +11,7 @@
 #include <boost/asio.hpp>
 
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -33,6 +34,8 @@ namespace rdma
                                          int _pkey_index,
                                          int _access_flags) -> void
     {
+        std::cout << "Changing QP state to INIT\n";
+
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_INIT;
@@ -46,6 +49,7 @@ namespace rdma
                             IBV_QP_ACCESS_FLAGS);
 
         _qp.modify_attribute(attrs, props);
+        std::cout << "QP state changed successfully!\n";
     }
 
     inline
@@ -53,42 +57,57 @@ namespace rdma
                                         std::uint32_t _dest_qp_num,
                                         std::uint32_t _rq_psn,
                                         std::uint8_t _lid,
-                                        std::uint8_t _gid,
+                                        const ibv_gid& _gid,
                                         std::uint8_t _port_number) -> void
     {
+        std::cout << "Changing QP state to RTR\n";
+
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
-        attrs.path_mtu = IBV_MTU_256;
+        attrs.path_mtu = IBV_MTU_1024;
         attrs.dest_qp_num = _dest_qp_num;
         attrs.rq_psn = _rq_psn;
         attrs.max_dest_rd_atomic = 1;
         attrs.min_rnr_timer = 12;
-        attrs.ah_attr.is_global = 0;
         attrs.ah_attr.dlid = _lid;
         attrs.ah_attr.sl = 0;
         attrs.ah_attr.src_path_bits = 0;
         attrs.ah_attr.port_num = _port_number;
 
+        if (_gid.global.interface_id) {
+            attrs.ah_attr.is_global = 1;
+            attrs.ah_attr.grh.dgid = _gid;
+            attrs.ah_attr.grh.flow_label = 0;
+            attrs.ah_attr.grh.hop_limit = 1;
+            attrs.ah_attr.grh.sgid_index = 0;
+            attrs.ah_attr.grh.traffic_class = 0;
+        }
+
         const auto props = (IBV_QP_STATE |
                             IBV_QP_AV |
                             IBV_QP_PATH_MTU |
                             IBV_QP_DEST_QPN |
-                            IBV_QP_RQ_PSN);
+                            IBV_QP_RQ_PSN |
+                            IBV_QP_MAX_DEST_RD_ATOMIC |
+                            IBV_QP_MIN_RNR_TIMER);
 
         _qp.modify_attribute(attrs, props);
+        std::cout << "QP state changed successfully!\n";
     }
 
     inline
-    auto change_queue_pair_state_to_rts(queue_pair& _qp) -> void
+    auto change_queue_pair_state_to_rts(queue_pair& _qp, std::uint32_t _sq_psn) -> void
     {
+        std::cout << "Changing QP state to RTS\n";
+
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTS;
-        attrs.sq_psn = 0;
+        attrs.sq_psn = _sq_psn;
         attrs.timeout = 14;
         attrs.retry_cnt = 7;
-        attrs.rnr_retry = 7; // infiinite
+        attrs.rnr_retry = 7;
         attrs.max_rd_atomic = 1;
 
         const auto props = (IBV_QP_STATE |
@@ -99,6 +118,7 @@ namespace rdma
                             IBV_QP_TIMEOUT);
 
         _qp.modify_attribute(attrs, props);
+        std::cout << "QP state changed successfully!\n";
     }
 
     struct queue_pair_info
@@ -123,7 +143,7 @@ namespace rdma
         if (_is_server) {
             boost::asio::io_service io_service;
 
-            tcp::endpoint endpoint{tcp::v4(), std::stoi(_port)};
+            tcp::endpoint endpoint(tcp::v4(), std::stoi(_port));
             tcp::acceptor acceptor{io_service, endpoint};
 
             tcp::iostream stream;
@@ -140,6 +160,8 @@ namespace rdma
 
             // Send the server's queue pair information.
             stream.write((char*) &_qp_info, sizeof(queue_pair_info));
+
+            // Copy the client's info into the out parameter.
             _qp_info = client_qp_info;
         }
         else {
@@ -199,7 +221,7 @@ namespace rdma
         std::cout << "vendor id          : " << info.vendor_id << '\n';
         std::cout << "vendor part id     : " << info.vendor_part_id << '\n';
         std::cout << "hardware version   : " << info.hw_ver << '\n';
-        std::cout << "physical port count: " << info.phys_port_cnt << '\n';
+        std::cout << "physical port count: " << (int) info.phys_port_cnt << '\n';
     }
 
     auto print_port_info(const context& _c, std::uint8_t _port_number) -> void
@@ -211,7 +233,23 @@ namespace rdma
         std::cout << "state     : " << rdma::to_string(info.state) << '\n';
         std::cout << "max mtu   : " << rdma::to_string(info.max_mtu) << '\n';
         std::cout << "active mtu: " << rdma::to_string(info.active_mtu) << '\n';
+        std::cout << "gid tbl ln: " << info.gid_tbl_len << '\n';
         std::cout << "lid       : " << info.lid << '\n';
+        std::cout << "sm lid    : " << info.sm_lid << '\n';
+        std::cout << "sm sl     : " << (int) info.sm_sl << '\n';
+    }
+
+    auto print_queue_pair_attributes(const ibv_qp_attr& _qp_attrs, const ibv_qp_init_attr& _qp_init_attrs) -> void
+    {
+        std::cout << "Queue Pair Info\n";
+        std::cout << "---------------\n";
+        std::cout << "pkey index        : " << _qp_attrs.pkey_index << '\n';
+        std::cout << "qp port           : " << (int) _qp_attrs.port_num << '\n';
+        std::cout << "q key             : " << _qp_attrs.qkey << '\n';
+        std::cout << "retry cnt         : " << (int) _qp_attrs.retry_cnt << '\n';
+        std::cout << "max qp rd atomic  : " << (int) _qp_attrs.max_rd_atomic << '\n';
+        std::cout << "min rnr timer     : " << (int) _qp_attrs.min_rnr_timer << '\n';
+        std::cout << "max dest rd atomic: " << (int) _qp_attrs.max_dest_rd_atomic << '\n';
     }
 
     auto print_queue_pair_info(const queue_pair_info& _qpi) -> void
@@ -220,9 +258,10 @@ namespace rdma
         std::cout << "rq_psn: " << _qpi.rq_psn << '\n';
         std::cout << "lid   : " << _qpi.lid << '\n';
 
-        std::cout << "gid   : 0x";
+        std::cout << "gid   : 0x" << std::hex;
         for (int i = 0; i < 16; ++i)
-            std::cout << std::hex << (int) _qpi.gid.raw[i];
+            std::cout << (std::uint16_t) _qpi.gid.raw[i];
+        std::cout.unsetf(std::ios::hex);
 
         std::cout << '\n';
     }

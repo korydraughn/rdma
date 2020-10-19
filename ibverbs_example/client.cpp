@@ -5,6 +5,7 @@
 #include <boost/asio.hpp>
 
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <iomanip>
 #include <string>
@@ -58,37 +59,27 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::queue_pair qp{pd, qp_init_attrs};
 
-        // TODO Exchange queue pair information.
-        //
-        // Use the Communication Manager (rdma_cm) to do this. The following information
-        // needs to be exchanged when connecting queue pairs:
-        // - QP number
-        // - LID number
-        // - RQ Packet Serial Number (PSN)
-        // - GID (if GRH is used)
-        
-        // Next steps:
-        //
-        // csm.ornl.gov/workshops/openshmem2014/documents/presentations_and_tutorials/Tutorials/Verbs%20programming%20tutorial-final.pdf
-        //   slide 78
-
+        // Exchange QP information.
         const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
-        static_cast<void>(q_attrs);
+
+        rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
+        std::cout << '\n';
 
         rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();
         qp_info.rq_psn = qp_attrs.rq_psn;
-        qp_info.lid = qp_attrs.ah_attr.dlid;
-        qp_info.gid = qp_attrs.ah_attr.grh.dgid;
+        qp_info.lid = context.port_info(port_number).lid;//qp_attrs.ah_attr.lid;
+        qp_info.gid = context.gid(port_number, pkey_index);
 
         std::cout << "Client Queue Pair Info\n";
         std::cout << "----------------------\n";
         rdma::print_queue_pair_info(qp_info);
+        //std::cout << "sq_psn: " << qp_attrs.sq_psn << '\n';
         std::cout << '\n';
 
-        constexpr auto is_server = false;
         const auto* host = _argv[1];
         const auto* port = _argv[2];
+        constexpr auto is_server = false;
         rdma::exchange_queue_pair_info(host, port, qp_info, is_server);
 
         std::cout << "Server Queue Pair Info\n";
@@ -96,15 +87,16 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_queue_pair_info(qp_info);
         std::cout << '\n';
 
-        constexpr auto access_flags = 0;
+        constexpr auto access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE;
         rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
-        rdma::change_queue_pair_state_to_rtr(qp, qp_info.qp_num, qp_info.rq_psn, qp_info.lid, qp_info.gid, port_number);
-        rdma::change_queue_pair_state_to_rts(qp);
+        //rdma::change_queue_pair_state_to_init(qp, port_number, 0, access_flags);
+        rdma::change_queue_pair_state_to_rtr(qp, qp_info.qp_num, qp_info.rq_psn, qp_info.lid,qp_info.gid, port_number);
+        rdma::change_queue_pair_state_to_rts(qp, qp_attrs.sq_psn);
 
         // This is not necessary for initialization. Memory Regions can be registered at
         // any time following initialization.
-        //std::vector<std::uint8_t> buffer(128);
-        //rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
+        std::vector<std::uint8_t> buffer(128);
+        rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
 
         return 0;
     }

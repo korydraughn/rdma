@@ -7,5 +7,6 @@
 #include "completion_queue.hpp"
 #include "queue_pair.hpp"
 #include "memory_region.hpp"
+#include "utility.hpp"
 
 #endif // KDD_RDMA_VERBS_HPP

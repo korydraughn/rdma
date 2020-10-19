@@ -107,7 +107,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
 
-        queue_pair_info qp_info{};
+        rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();
         qp_info.rq_psn = qp_attrs.rq_psn;
         qp_info.lid = qp_attrs.ah_attr.dlid;

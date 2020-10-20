@@ -15,6 +15,7 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <sstream>
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     inline std::uint64_t htonll(std::uint64_t _x) { return bswap_64(_x); }
@@ -258,10 +259,16 @@ namespace rdma
         std::cout << "rq_psn: " << _qpi.rq_psn << '\n';
         std::cout << "lid   : " << _qpi.lid << '\n';
 
-        std::cout << "gid   : 0x" << std::hex;
-        for (int i = 0; i < 16; ++i)
-            std::cout << (std::uint16_t) _qpi.gid.raw[i];
-        std::cout.unsetf(std::ios::hex);
+        std::ostringstream ss;
+        for (int i = 0; i < 8; ++i) {
+            for (int j = 0; j < 2; ++j)
+                ss << std::hex << std::setw(2) << std::setfill('0') << std::right
+                   << static_cast<int>(_qpi.gid.raw[i * 2 + j]);
+
+            if (i < 7)
+                ss << ':';
+        }
+        std::cout << "gid   : " << ss.str() << '\n';
 
         std::cout << '\n';
     }

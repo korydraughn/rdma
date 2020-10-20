@@ -85,9 +85,8 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_queue_pair_info(qp_info);
         std::cout << '\n';
 
-        constexpr auto access_flags = IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE;
+        constexpr auto access_flags = 0; //IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE;
         rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
-        //rdma::change_queue_pair_state_to_init(qp, port_number, 0, access_flags);
         rdma::change_queue_pair_state_to_rtr(qp, qp_info.qp_num, qp_info.rq_psn, qp_info.lid, qp_info.gid, port_number);
         rdma::change_queue_pair_state_to_rts(qp, qp_attrs.sq_psn);
 

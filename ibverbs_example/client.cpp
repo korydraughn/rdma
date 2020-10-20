@@ -69,7 +69,8 @@ auto main(int _argc, char* _argv[]) -> int
         qp_info.qp_num = qp.queue_pair_number();
         qp_info.rq_psn = qp_attrs.rq_psn;
         qp_info.lid = context.port_info(port_number).lid;//qp_attrs.ah_attr.lid;
-        qp_info.gid = context.gid(port_number, pkey_index);
+        //qp_info.gid = context.gid(port_number, pkey_index);
+        qp_info.gid = context.gid(port_number, 0);
 
         std::cout << "Client Queue Pair Info\n";
         std::cout << "----------------------\n";

@@ -1,0 +1,4 @@
+- As of now, the programs are able to connect QPs and change the QP state to RTS.
+- However, this only works in my VMs when the pkey_index is set to 2.
+- rc_pingpong works with 1.
+- Why don't any of these work with with a pkey_index of 0 (the guaranteed value)?

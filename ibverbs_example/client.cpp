@@ -101,7 +101,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
 
         const auto wc = qp.post_send(buffer, mr);
-        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) ", Code: " << wc.status << '\n';
+        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
         if (wc.status == IBV_WC_SUCCESS)
             std::cout << "Message sent!\n";

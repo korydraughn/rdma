@@ -95,7 +95,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
 
         const auto wc = qp.post_receive(buffer, mr);
-        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) ", Code: " << wc.status << '\n';
+        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
         if (wc.status == IBV_WC_SUCCESS) {
             std::cout << "Message received: ";
@@ -103,7 +103,7 @@ auto main(int _argc, char* _argv[]) -> int
             std::cout << '\n';
         }
         else {
-            std::cout "Error receiving message.\n";
+            std::cout << "Error receiving message.\n";
         }
 
         return 0;

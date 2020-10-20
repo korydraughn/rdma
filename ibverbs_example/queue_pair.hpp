@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include <iostream>
 #include <tuple>
 #include <vector>
 #include <stdexcept>
@@ -21,9 +22,9 @@ namespace rdma
     {
     public:
         queue_pair(const protection_domain& _pd,
-                   const ibv_qp_init_attr& _attrs,
+                   ibv_qp_init_attr& _attrs,
                    const completion_queue& _cq)
-            : qp_{ibv_create_qp(&_pd.handle(), const_cast<ibv_qp_init_attr*>(&_attrs))}
+            : qp_{ibv_create_qp(&_pd.handle(), &_attrs)}
             , cq_{&_cq.handle()}
         {
             if (!qp_) {
@@ -66,7 +67,7 @@ namespace rdma
             return {attrs, init_attrs};
         }
 
-        auto post_send(const std::vector<std::uint8_t>& _buffer, const memory_region& _mr) -> ibv_wc
+        auto post_send(const std::vector<std::uint8_t>& _buffer, const memory_region& _mr) -> void
         {
             // TODO The incoming buffer could be registered for the duration
             // of this function call. This would simplify usage of the library
@@ -74,36 +75,25 @@ namespace rdma
             // of the queue pair. This also applies to post_receive().
 
             ibv_sge sg_list{};
-            sg_list.addr = reinterpret_cast<std::uintptr_t>(_buffer.data());
+            sg_list.addr = (std::uintptr_t) _buffer.data();
             sg_list.length = _buffer.size();
             sg_list.lkey = _mr.local_key();
 
             ibv_send_wr wr{};
             wr.opcode = IBV_WR_SEND;
+            wr.send_flags = IBV_SEND_SIGNALED;
             wr.sg_list = &sg_list;
             wr.num_sge = 1;
 
-            ibv_send_wr* bad_wr;
+            ibv_send_wr* bad_wr{};
 
             if (ibv_post_send(qp_, &wr, &bad_wr)) {
                 perror("ibv_post_send");
                 throw std::runtime_error{"ibv_post_send error"};
             }
-
-            // Poll completion queue and wait for send work completion.
-            int n_comp = 0;
-            ibv_wc wc{};
-            while ((n_comp = ibv_poll_cq(cq_, 1, &wc)) == 0);
-
-            if (n_comp < 0) {
-                perror("ibv_poll_cq");
-                throw std::runtime_error{"ibv_poll_cq send error"};
-            }
-
-            return wc;
         }
 
-        auto post_receive(std::vector<std::uint8_t>& _buffer, const memory_region& _mr) -> ibv_wc
+        auto post_receive(std::vector<std::uint8_t>& _buffer, const memory_region& _mr) -> void
         {
             // TODO The incoming buffer could be registered for the duration
             // of this function call. This would simplify usage of the library
@@ -111,7 +101,7 @@ namespace rdma
             // of the queue pair. This also applies to post_receive().
 
             ibv_sge sg_list{};
-            sg_list.addr = reinterpret_cast<std::uintptr_t>(_buffer.data());
+            sg_list.addr = (std::uintptr_t) _buffer.data();
             sg_list.length = _buffer.size();
             sg_list.lkey = _mr.local_key();
 
@@ -119,22 +109,28 @@ namespace rdma
             wr.sg_list = &sg_list;
             wr.num_sge = 1;
 
-            ibv_recv_wr* bad_wr;
+            ibv_recv_wr* bad_wr{};
 
             if (ibv_post_recv(qp_, &wr, &bad_wr)) {
                 perror("ibv_post_recv");
                 throw std::runtime_error{"ibv_post_recv error"};
             }
+        }
 
-            // Poll completion queue and wait for receive work completion.
+        auto wait_for_work_completion() -> ibv_wc
+        {
             int n_comp = 0;
             ibv_wc wc{};
-            while ((n_comp = ibv_poll_cq(cq_, 1, &wc)) == 0);
 
-            if (n_comp < 0) {
-                perror("ibv_poll_cq");
-                throw std::runtime_error{"ibv_poll_cq receive error"};
+            do {
+                n_comp = ibv_poll_cq(cq_, 1, &wc);
+
+                if (n_comp < 0) {
+                    perror("ibv_poll_cq");
+                    throw std::runtime_error{"ibv_poll_cq receive error"};
+                }
             }
+            while (n_comp == 0);
 
             return wc;
         }

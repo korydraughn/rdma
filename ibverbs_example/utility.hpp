@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <string>
 #include <sstream>
+#include <random>
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     inline std::uint64_t htonll(std::uint64_t _x) { return bswap_64(_x); }
@@ -36,7 +37,6 @@ namespace rdma
                                          int _access_flags) -> void
     {
         std::cout << "Changing QP state to INIT\n";
-
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_INIT;
@@ -59,10 +59,11 @@ namespace rdma
                                         std::uint32_t _rq_psn,
                                         std::uint8_t _lid,
                                         const ibv_gid& _gid,
-                                        std::uint8_t _port_number) -> void
+                                        std::uint8_t _port_number,
+                                        std::uint8_t _gid_index,
+                                        bool _grh_required) -> void
     {
         std::cout << "Changing QP state to RTR\n";
-
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
@@ -76,12 +77,12 @@ namespace rdma
         attrs.ah_attr.src_path_bits = 0;
         attrs.ah_attr.port_num = _port_number;
 
-        if (_gid.global.interface_id) {
+        if (_grh_required) {// && _gid.global.interface_id) {
             attrs.ah_attr.is_global = 1;
             attrs.ah_attr.grh.dgid = _gid;
             attrs.ah_attr.grh.flow_label = 0;
             attrs.ah_attr.grh.hop_limit = 1;
-            attrs.ah_attr.grh.sgid_index = 0;
+            attrs.ah_attr.grh.sgid_index = _gid_index;
             attrs.ah_attr.grh.traffic_class = 0;
         }
 
@@ -101,7 +102,6 @@ namespace rdma
     auto change_queue_pair_state_to_rts(queue_pair& _qp, std::uint32_t _sq_psn) -> void
     {
         std::cout << "Changing QP state to RTS\n";
-
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTS;
@@ -209,6 +209,14 @@ namespace rdma
         }
     }
 
+    auto generate_random_int() -> std::uint32_t
+    {
+        std::random_device rd;
+        std::mt19937 gen{rd()};
+        std::uniform_int_distribution<std::uint32_t> distrib{1, 1 << 16};
+        return distrib(gen);
+    }
+
     auto print_device_info(const context& _c) -> void
     {
         const auto info = _c.device_info();
@@ -231,13 +239,17 @@ namespace rdma
 
         std::cout << "Port Information\n";
         std::cout << "----------------\n";
-        std::cout << "state     : " << rdma::to_string(info.state) << '\n';
-        std::cout << "max mtu   : " << rdma::to_string(info.max_mtu) << '\n';
-        std::cout << "active mtu: " << rdma::to_string(info.active_mtu) << '\n';
-        std::cout << "gid tbl ln: " << info.gid_tbl_len << '\n';
-        std::cout << "lid       : " << info.lid << '\n';
-        std::cout << "sm lid    : " << info.sm_lid << '\n';
-        std::cout << "sm sl     : " << (int) info.sm_sl << '\n';
+        std::cout << "state       : " << to_string(info.state) << '\n';
+        std::cout << "max mtu     : " << to_string(info.max_mtu) << '\n';
+        std::cout << "active mtu  : " << to_string(info.active_mtu) << '\n';
+        std::cout << "gid tbl ln  : " << info.gid_tbl_len << '\n';
+        std::cout << "lid         : " << info.lid << '\n';
+        std::cout << "sm lid      : " << info.sm_lid << '\n';
+        std::cout << "sm sl       : " << (int) info.sm_sl << '\n';
+
+        const auto grh_required = (info.flags & IBV_QPF_GRH_REQUIRED) == IBV_QPF_GRH_REQUIRED;
+        std::cout << "grh required: " << std::boolalpha << grh_required << '\n';
+        std::cout.unsetf(std::ios::boolalpha);
     }
 
     auto print_queue_pair_attributes(const ibv_qp_attr& _qp_attrs, const ibv_qp_init_attr& _qp_init_attrs) -> void
@@ -248,9 +260,15 @@ namespace rdma
         std::cout << "qp port           : " << (int) _qp_attrs.port_num << '\n';
         std::cout << "q key             : " << _qp_attrs.qkey << '\n';
         std::cout << "retry cnt         : " << (int) _qp_attrs.retry_cnt << '\n';
-        std::cout << "max qp rd atomic  : " << (int) _qp_attrs.max_rd_atomic << '\n';
         std::cout << "min rnr timer     : " << (int) _qp_attrs.min_rnr_timer << '\n';
+        std::cout << "max rd atomic     : " << (int) _qp_attrs.max_rd_atomic << '\n';
+        std::cout << "max qp rd atomic  : " << (int) _qp_attrs.max_rd_atomic << '\n';
         std::cout << "max dest rd atomic: " << (int) _qp_attrs.max_dest_rd_atomic << '\n';
+        std::cout << "max send wr       : " << _qp_attrs.cap.max_send_wr << '\n';
+        std::cout << "max recv wr       : " << _qp_attrs.cap.max_recv_wr << '\n';
+        std::cout << "max send sge      : " << _qp_attrs.cap.max_send_sge << '\n';
+        std::cout << "max recv sge      : " << _qp_attrs.cap.max_recv_sge << '\n';
+        std::cout << "max inline data   : " << _qp_attrs.cap.max_inline_data << '\n';
     }
 
     auto print_queue_pair_info(const queue_pair_info& _qpi) -> void
@@ -269,8 +287,6 @@ namespace rdma
                 ss << ':';
         }
         std::cout << "gid   : " << ss.str() << '\n';
-
-        std::cout << '\n';
     }
 } // namespace rdma
 

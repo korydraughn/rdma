@@ -14,8 +14,8 @@
 
 auto main(int _argc, char* _argv[]) -> int
 {
-    if (_argc != 2) {
-        std::cout << "USAGE: server <port>\n";
+    if (_argc != 3) {
+        std::cout << "USAGE: server <port> <pkey_index>\n";
         return 1;
     }
 
@@ -37,7 +37,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_port_info(context, port_number);
         std::cout << '\n';
 
-        constexpr auto pkey_index = 0;
+        const auto pkey_index = std::stoi(_argv[2]);
         std::cout << "pkey: " << context.pkey(port_number, pkey_index) << '\n';
         std::cout << '\n';
 
@@ -68,13 +68,11 @@ auto main(int _argc, char* _argv[]) -> int
         qp_info.qp_num = qp.queue_pair_number();
         qp_info.rq_psn = qp_attrs.rq_psn;
         qp_info.lid = context.port_info(port_number).lid;//qp_attrs.ah_attr.lid;
-        //qp_info.gid = context.gid(port_number, pkey_index);
-        qp_info.gid = context.gid(port_number, 0);
+        qp_info.gid = context.gid(port_number, pkey_index);
 
         std::cout << "Server Queue Pair Info\n";
         std::cout << "----------------------\n";
         rdma::print_queue_pair_info(qp_info);
-        //std::cout << "sq_psn: " << qp_attrs.sq_psn << '\n';
         std::cout << '\n';
 
         const auto* port = _argv[1];
@@ -95,6 +93,18 @@ auto main(int _argc, char* _argv[]) -> int
         // any time following initialization.
         std::vector<std::uint8_t> buffer(128);
         rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
+
+        const auto wc = qp.post_receive(buffer, mr);
+        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) ", Code: " << wc.status << '\n';
+
+        if (wc.status == IBV_WC_SUCCESS) {
+            std::cout << "Message received: ";
+            std::cout.write((char*) buffer.data(), buffer.size());
+            std::cout << '\n';
+        }
+        else {
+            std::cout "Error receiving message.\n";
+        }
 
         return 0;
     }

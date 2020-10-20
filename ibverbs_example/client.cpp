@@ -11,11 +11,13 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <iterator>
+#include <algorithm>
 
 auto main(int _argc, char* _argv[]) -> int
 {
-    if (_argc != 3) {
-        std::cout << "USAGE: client <host> <port>\n";
+    if (_argc != 4) {
+        std::cout << "USAGE: client <host> <port> <pkey_index>\n";
         return 1;
     }
 
@@ -38,7 +40,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_port_info(context, port_number);
         std::cout << '\n';
 
-        constexpr auto pkey_index = 0;
+        const auto pkey_index = std::stoi(_argv[3]);
         std::cout << "pkey: " << context.pkey(port_number, pkey_index) << '\n';
         std::cout << '\n';
 
@@ -69,13 +71,11 @@ auto main(int _argc, char* _argv[]) -> int
         qp_info.qp_num = qp.queue_pair_number();
         qp_info.rq_psn = qp_attrs.rq_psn;
         qp_info.lid = context.port_info(port_number).lid;//qp_attrs.ah_attr.lid;
-        //qp_info.gid = context.gid(port_number, pkey_index);
-        qp_info.gid = context.gid(port_number, 0);
+        qp_info.gid = context.gid(port_number, pkey_index);
 
         std::cout << "Client Queue Pair Info\n";
         std::cout << "----------------------\n";
         rdma::print_queue_pair_info(qp_info);
-        //std::cout << "sq_psn: " << qp_attrs.sq_psn << '\n';
         std::cout << '\n';
 
         const auto* host = _argv[1];
@@ -96,7 +96,17 @@ auto main(int _argc, char* _argv[]) -> int
         // This is not necessary for initialization. Memory Regions can be registered at
         // any time following initialization.
         std::vector<std::uint8_t> buffer(128);
+        const char msg[] = "This was sent from the client!";
+        std::copy(msg, msg + strlen(msg), std::begin(buffer));
         rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
+
+        const auto wc = qp.post_send(buffer, mr);
+        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) ", Code: " << wc.status << '\n';
+
+        if (wc.status == IBV_WC_SUCCESS)
+            std::cout << "Message sent!\n";
+        else
+            std::cout << "Could not send message.\n";
 
         return 0;
     }

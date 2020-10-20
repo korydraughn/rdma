@@ -3,6 +3,7 @@
 
 #include "context.hpp"
 #include "protection_domain.hpp"
+#include "completion_queue.hpp"
 #include "memory_region.hpp"
 
 #include <infiniband/verbs.h>
@@ -19,8 +20,11 @@ namespace rdma
     class queue_pair
     {
     public:
-        queue_pair(const protection_domain& _pd, const ibv_qp_init_attr& _attrs)
+        queue_pair(const protection_domain& _pd,
+                   const ibv_qp_init_attr& _attrs,
+                   const completion_queue& _cq)
             : qp_{ibv_create_qp(&_pd.handle(), const_cast<ibv_qp_init_attr*>(&_attrs))}
+            , cq_{&_cq.handle()}
         {
             if (!qp_) {
                 perror("ibv_create_qp");
@@ -62,8 +66,7 @@ namespace rdma
             return {attrs, init_attrs};
         }
 
-        auto post_send(const std::vector<std::uint8_t>& _buffer,
-                       const memory_region& _mr) -> void
+        auto post_send(const std::vector<std::uint8_t>& _buffer, const memory_region& _mr) -> ibv_wc
         {
             // TODO The incoming buffer could be registered for the duration
             // of this function call. This would simplify usage of the library
@@ -87,11 +90,20 @@ namespace rdma
                 throw std::runtime_error{"ibv_post_send error"};
             }
 
-            // TODO Poll completion queue and wait for send work completion.
+            // Poll completion queue and wait for send work completion.
+            int n_comp = 0;
+            ibv_wc wc{};
+            while ((n_comp = ibv_poll_cq(cq_, 1, &wc)) == 0);
+
+            if (n_comp < 0) {
+                perror("ibv_poll_cq");
+                throw std::runtime_error{"ibv_poll_cq send error"};
+            }
+
+            return wc;
         }
 
-        auto post_receive(std::vector<std::uint8_t>& _buffer,
-                          const memory_region& _mr) -> void
+        auto post_receive(std::vector<std::uint8_t>& _buffer, const memory_region& _mr) -> ibv_wc
         {
             // TODO The incoming buffer could be registered for the duration
             // of this function call. This would simplify usage of the library
@@ -114,11 +126,22 @@ namespace rdma
                 throw std::runtime_error{"ibv_post_recv error"};
             }
 
-            // TODO Poll completion queue and wait for receive work completion.
+            // Poll completion queue and wait for receive work completion.
+            int n_comp = 0;
+            ibv_wc wc{};
+            while ((n_comp = ibv_poll_cq(cq_, 1, &wc)) == 0);
+
+            if (n_comp < 0) {
+                perror("ibv_poll_cq");
+                throw std::runtime_error{"ibv_poll_cq receive error"};
+            }
+
+            return wc;
         }
 
     private:
         ibv_qp* qp_;
+        ibv_cq* cq_;
     }; // class queue_pair
 } // namespace rdma
 

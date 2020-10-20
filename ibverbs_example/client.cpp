@@ -59,7 +59,7 @@ auto main(int _argc, char* _argv[]) -> int
         qp_init_attrs.cap.max_send_sge = 1;
         qp_init_attrs.cap.max_recv_sge = 1;
 
-        rdma::queue_pair qp{pd, qp_init_attrs};
+        rdma::queue_pair qp{pd, qp_init_attrs, cq};
 
         // Exchange QP information.
         const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);

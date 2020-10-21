@@ -30,6 +30,14 @@
 
 namespace rdma
 {
+    struct queue_pair_info
+    {
+        std::uint32_t qp_num;
+        std::uint32_t rq_psn;
+        std::uint16_t lid;
+        ibv_gid gid;
+    };
+
     inline
     auto change_queue_pair_state_to_init(queue_pair& _qp,
                                          std::uint8_t _port_number,
@@ -118,14 +126,6 @@ namespace rdma
         _qp.modify_attribute(attrs, props);
         std::cout << "QP state changed successfully!\n";
     }
-
-    struct queue_pair_info
-    {
-        std::uint32_t qp_num;
-        std::uint32_t rq_psn;
-        std::uint16_t lid;
-        ibv_gid gid;
-    };
 
     inline
     auto exchange_queue_pair_info(const std::string& _host,

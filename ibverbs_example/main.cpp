@@ -27,7 +27,7 @@ auto main(int _argc, char* _argv[]) -> int
             ("port,p", po::value<std::string>()->default_value("9900"), "The port to connect to.")
             ("gid-index,g", po::value<int>()->default_value(0), "The index of the GID to use.")
             ("skip-rdma,x", po::bool_switch(), "Skips RDMA message passing steps.")
-            ("help,h", po::bool_switch(), "Show this message.");
+            ("help", po::bool_switch(), "Show this message.");
 
         po::variables_map vm;
         po::store(po::parse_command_line(_argc, _argv, desc), vm);

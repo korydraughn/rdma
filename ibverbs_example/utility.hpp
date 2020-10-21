@@ -264,11 +264,11 @@ namespace rdma
         std::cout << "max rd atomic     : " << (int) _qp_attrs.max_rd_atomic << '\n';
         std::cout << "max qp rd atomic  : " << (int) _qp_attrs.max_rd_atomic << '\n';
         std::cout << "max dest rd atomic: " << (int) _qp_attrs.max_dest_rd_atomic << '\n';
-        std::cout << "max send wr       : " << _qp_attrs.cap.max_send_wr << '\n';
-        std::cout << "max recv wr       : " << _qp_attrs.cap.max_recv_wr << '\n';
-        std::cout << "max send sge      : " << _qp_attrs.cap.max_send_sge << '\n';
-        std::cout << "max recv sge      : " << _qp_attrs.cap.max_recv_sge << '\n';
-        std::cout << "max inline data   : " << _qp_attrs.cap.max_inline_data << '\n';
+        std::cout << "max send wr       : " << _qp_init_attrs.cap.max_send_wr << '\n';
+        std::cout << "max recv wr       : " << _qp_init_attrs.cap.max_recv_wr << '\n';
+        std::cout << "max send sge      : " << _qp_init_attrs.cap.max_send_sge << '\n';
+        std::cout << "max recv sge      : " << _qp_init_attrs.cap.max_recv_sge << '\n';
+        std::cout << "max inline data   : " << _qp_init_attrs.cap.max_inline_data << '\n';
     }
 
     auto print_queue_pair_info(const queue_pair_info& _qpi, bool _local_info) -> void

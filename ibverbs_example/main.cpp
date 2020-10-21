@@ -78,12 +78,6 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::queue_pair qp{pd, qp_init_attrs, cq};
 
         // Exchange QP information.
-        const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
-
-        std::cout << "(Original) ";
-        rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
-        std::cout << '\n';
-
         const auto sq_psn = rdma::generate_random_int();
         const auto port_info = context.port_info(port_number);
         const auto gid_index = vm["gid-index"].as<int>();
@@ -125,12 +119,9 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::change_queue_pair_state_to_rts(qp, sq_psn);
 
-        {
-            const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
-            std::cout << "\n(Final) ";
-            rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
-            std::cout << '\n';
-        }
+        const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
+        rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
+        std::cout << '\n';
 
         // Memory Regions can be registered at any time. However, doing this in the
         // data path could negatively affect performance.

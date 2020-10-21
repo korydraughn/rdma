@@ -105,7 +105,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_queue_pair_info(qp_info, !local_info);
         std::cout << '\n';
 
-        constexpr auto access_flags = 0;//IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+        constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
         rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
 
         // Memory Regions can be registered at any time. However, doing this in the

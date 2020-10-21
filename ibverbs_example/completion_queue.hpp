@@ -51,8 +51,8 @@ namespace rdma
     class completion_queue
     {
     public:
-        completion_queue(int _cpe_size, const context& _ctx)
-            : cq_{ibv_create_cq(&_ctx.handle(), _cpe_size, nullptr, nullptr, 0)}
+        completion_queue(int _cp_size, const context& _ctx)
+            : cq_{ibv_create_cq(&_ctx.handle(), _cp_size, nullptr, nullptr, 0)}
         {
             if (!cq_) {
                 perror("ibv_create_cq");

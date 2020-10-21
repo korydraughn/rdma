@@ -72,11 +72,11 @@ namespace rdma
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
-        attrs.path_mtu = IBV_MTU_512;
+        attrs.path_mtu = IBV_MTU_1024;
         attrs.dest_qp_num = _remote_info.qp_num;
         attrs.rq_psn = _remote_info.rq_psn;
         attrs.max_dest_rd_atomic = 1;
-        attrs.min_rnr_timer = 12;
+        attrs.min_rnr_timer = 18;
         attrs.ah_attr.dlid = _remote_info.lid;
         attrs.ah_attr.sl = 0;
         attrs.ah_attr.src_path_bits = 0;
@@ -87,7 +87,7 @@ namespace rdma
             attrs.ah_attr.grh.dgid = _remote_info.gid;
             attrs.ah_attr.grh.flow_label = 0;
             attrs.ah_attr.grh.hop_limit = 1;
-            attrs.ah_attr.grh.sgid_index = _gid_index; //0;
+            attrs.ah_attr.grh.sgid_index = _gid_index;
             attrs.ah_attr.grh.traffic_class = 0;
         }
 
@@ -111,9 +111,9 @@ namespace rdma
 
         attrs.qp_state = IBV_QPS_RTS;
         attrs.sq_psn = _sq_psn;
-        attrs.timeout = 14;
-        attrs.retry_cnt = 0; //7; // Set to zero for development.
-        attrs.rnr_retry = 0; //7; // Set to zero for development.
+        attrs.timeout = 20;
+        attrs.retry_cnt = 7;
+        attrs.rnr_retry = 7;
         attrs.max_rd_atomic = 1;
 
         const auto props = (IBV_QP_STATE |
@@ -196,7 +196,7 @@ namespace rdma
     {
         using tcp = boost::asio::ip::tcp;
 
-        std::cout << "Syncing client and server [" << _data << "] ... ";
+        std::cout << "Syncing client and server ... ";
 
         if (_is_server) {
             boost::asio::io_service io_service;
@@ -222,7 +222,10 @@ namespace rdma
                 throw std::runtime_error{"connect_queue_pairs client error"};
 
             stream.write((char*) &_data, sizeof(int));
-            stream.read((char*) &_data, sizeof(int));
+
+            int remote_data;
+            stream.read((char*) &remote_data, sizeof(int));
+            std::cout << "[synced: " << (_data == remote_data) << "] ";
         }
 
         std::cout << "done!\n";

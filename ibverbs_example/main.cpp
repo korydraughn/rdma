@@ -104,6 +104,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_queue_pair_info(qp_info, !local_info);
         std::cout << '\n';
 
+        // Change the QP's state to RTS.
         constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
         rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
 
@@ -119,6 +120,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::change_queue_pair_state_to_rts(qp, sq_psn);
 
+        std::cout << '\n';
         const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
         rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
         std::cout << '\n';
@@ -130,9 +132,14 @@ auto main(int _argc, char* _argv[]) -> int
 
         if (!vm["skip-rdma"].as<bool>()) {
             if (run_server) {
+                std::cout << "Posting receive request ... ";
                 qp.post_receive(buffer, mr);
+                std::cout << "done!\n";
 
+                std::cout << "Waiting for completion ... ";
                 const auto wc = qp.wait_for_completion();
+                std::cout << "done!\n";
+
                 std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
                 if (wc.status == IBV_WC_SUCCESS) {
@@ -147,9 +154,15 @@ auto main(int _argc, char* _argv[]) -> int
             else {
                 const char msg[] = "This was sent from the client!";
                 std::copy(msg, msg + strlen(msg), buffer.data() + (grh_required ? 40 : 0));
-                qp.post_send(buffer, mr);
 
+                std::cout << "Posting send request ... ";
+                qp.post_send(buffer, mr);
+                std::cout << "done!\n";
+
+                std::cout << "Waiting for completion ... ";
                 const auto wc = qp.wait_for_completion();
+                std::cout << "done!\n";
+
                 std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
                 if (wc.status == IBV_WC_SUCCESS)

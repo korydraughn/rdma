@@ -26,6 +26,7 @@ auto main(int _argc, char* _argv[]) -> int
             ("host,h", po::value<std::string>(), "The host to connect to. Ignored if -s is used.")
             ("port,p", po::value<std::string>()->default_value("9900"), "The port to connect to.")
             ("gid-index,g", po::value<int>()->default_value(0), "The index of the GID to use.")
+            ("skip-rdma,x", po::bool_switch(), "Skips RDMA message passing steps.")
             ("help,h", po::bool_switch(), "Show this message.");
 
         po::variables_map vm;
@@ -135,33 +136,35 @@ auto main(int _argc, char* _argv[]) -> int
         //rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
         rdma::memory_region mr{pd, buffer, access_flags};
 
-        if (run_server) {
-            qp.post_receive(buffer, mr);
+        if (!vm["skip-rdma"].as<bool>()) {
+            if (run_server) {
+                qp.post_receive(buffer, mr);
 
-            const auto wc = qp.wait_for_completion();
-            std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
+                const auto wc = qp.wait_for_completion();
+                std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
-            if (wc.status == IBV_WC_SUCCESS) {
-                std::cout << "Message received: ";
-                std::cout.write((char*) buffer.data(), buffer.size());
-                std::cout << '\n';
+                if (wc.status == IBV_WC_SUCCESS) {
+                    std::cout << "Message received: ";
+                    std::cout.write((char*) buffer.data(), buffer.size());
+                    std::cout << '\n';
+                }
+                else {
+                    std::cout << "Error receiving message.\n";
+                }
             }
             else {
-                std::cout << "Error receiving message.\n";
+                const char msg[] = "This was sent from the client!";
+                std::copy(msg, msg + strlen(msg), buffer.data() + (grh_required ? 40 : 0));
+                qp.post_send(buffer, mr);
+
+                const auto wc = qp.wait_for_completion();
+                std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
+
+                if (wc.status == IBV_WC_SUCCESS)
+                    std::cout << "Message sent!\n";
+                else
+                    std::cout << "Could not send message.\n";
             }
-        }
-        else {
-            const char msg[] = "This was sent from the client!";
-            std::copy(msg, msg + strlen(msg), buffer.data() + (grh_required ? 40 : 0));
-            qp.post_send(buffer, mr);
-
-            const auto wc = qp.wait_for_completion();
-            std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
-
-            if (wc.status == IBV_WC_SUCCESS)
-                std::cout << "Message sent!\n";
-            else
-                std::cout << "Could not send message.\n";
         }
 
         return 0;

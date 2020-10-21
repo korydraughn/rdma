@@ -104,8 +104,8 @@ namespace rdma
         attrs.qp_state = IBV_QPS_RTS;
         attrs.sq_psn = _sq_psn;
         attrs.timeout = 14;
-        attrs.retry_cnt = 7;
-        attrs.rnr_retry = 7;
+        attrs.retry_cnt = 0; //7; // Set to zero for development.
+        attrs.rnr_retry = 0; //7; // Set to zero for development.
         attrs.max_rd_atomic = 1;
 
         const auto props = (IBV_QP_STATE |
@@ -144,6 +144,7 @@ namespace rdma
             tcp::endpoint endpoint(tcp::v4(), std::stoi(_port));
             tcp::acceptor acceptor{io_service, endpoint};
 
+            std::cout << "Waiting for client to connect ... ";
             tcp::iostream stream;
             boost::system::error_code ec;
             acceptor.accept(*stream.rdbuf(), ec);
@@ -151,6 +152,9 @@ namespace rdma
             if (ec) {
                 throw std::runtime_error{"connect_queue_pairs server error"};
             }
+
+            std::cout << "connected!\n";
+            std::cout << "Exchanging QP information with client ... ";
 
             // Capture the client's queue pair information.
             queue_pair_info client_qp_info{};
@@ -163,10 +167,14 @@ namespace rdma
             _qp_info = client_qp_info;
         }
         else {
+            std::cout << "Connecting to server ... ";
             tcp::iostream stream{_host, _port};
 
             if (!stream)
                 throw std::runtime_error{"connect_queue_pairs client error"};
+
+            std::cout << "connected!\n";
+            std::cout << "Exchanging QP information with server ... ";
 
             // Send the client's queue pair information to the server.
             stream.write((char*) &_qp_info, sizeof(queue_pair_info));
@@ -174,6 +182,8 @@ namespace rdma
             // Capture the server's queue pair information.
             stream.read((char*) &_qp_info, sizeof(queue_pair_info));
         }
+
+        std::cout << "done!\n";
 
         _qp_info.qp_num = ntohl(_qp_info.qp_num);
         _qp_info.lid = ntohs(_qp_info.lid);

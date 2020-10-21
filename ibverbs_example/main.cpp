@@ -24,7 +24,7 @@ auto main(int _argc, char* _argv[]) -> int
         desc.add_options()
             ("server,s", po::bool_switch(), "Launches server.")
             ("host,h", po::value<std::string>(), "The host to connect to.")
-            ("port,p", po::value<int>()->default_value(9900), "The port to connect to.")
+            ("port,p", po::value<std::string>()->default_value("9900"), "The port to connect to.")
             ("gid-index,g", po::value<int>()->default_value(0), "The index of the GID to use.")
             ("help,h", po::bool_switch(), "Show this message.");
 

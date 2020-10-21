@@ -271,9 +271,9 @@ namespace rdma
         std::cout << "max inline data   : " << _qp_attrs.cap.max_inline_data << '\n';
     }
 
-    auto print_queue_pair_info(const queue_pair_info& _qpi, bool _run_server) -> void
+    auto print_queue_pair_info(const queue_pair_info& _qpi, bool _local_info) -> void
     {
-        if (_run_server) {
+        if (_local_info) {
             std::cout << "Local Queue Pair Information\n";
             std::cout << "----------------------------\n";
         }

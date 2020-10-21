@@ -61,11 +61,9 @@ auto main(int _argc, char* _argv[]) -> int
         std::cout << '\n';
 
         rdma::protection_domain pd{context};
-        //rdma::completion_event_channel evt_ch{context};
 
         constexpr auto cqe_size = 1;
         rdma::completion_queue cq{cqe_size, context};
-        //rdma::completion_queue cq{cqe_size, evt_ch};
 
         ibv_qp_init_attr qp_init_attrs{};
         qp_init_attrs.qp_type = IBV_QPT_RC;
@@ -96,16 +94,20 @@ auto main(int _argc, char* _argv[]) -> int
         qp_info.lid = port_info.lid;
         qp_info.gid = context.gid(port_number, gid_index);
 
-        const auto run_server = vm["server"].as<bool>();
-        rdma::print_queue_pair_info(qp_info, run_server);
+        constexpr auto local_info = true;
+        rdma::print_queue_pair_info(qp_info, local_info);
         std::cout << '\n';
 
+        const auto run_server = vm["server"].as<bool>();
         const auto host = run_server ? "" : vm["host"].as<std::string>();
         const auto port = vm["port"].as<std::string>();
 
+        // Exchange the required QP information between the client and server.
+        // This is required so that the QPs can be transistioned through the proper
+        // states and connected for data communication.
         rdma::exchange_queue_pair_info(host, port, qp_info, run_server);
 
-        rdma::print_queue_pair_info(qp_info, !run_server);
+        rdma::print_queue_pair_info(qp_info, !local_info);
         std::cout << '\n';
 
         constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
@@ -133,7 +135,6 @@ auto main(int _argc, char* _argv[]) -> int
         // Memory Regions can be registered at any time. However, doing this in the
         // data path could negatively affect performance.
         std::vector<std::uint8_t> buffer(128);
-        //rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
         rdma::memory_region mr{pd, buffer, access_flags};
 
         if (!vm["skip-rdma"].as<bool>()) {

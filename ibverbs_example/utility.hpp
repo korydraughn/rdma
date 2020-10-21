@@ -77,7 +77,7 @@ namespace rdma
         attrs.ah_attr.src_path_bits = 0;
         attrs.ah_attr.port_num = _port_number;
 
-        if (_grh_required) {// && _gid.global.interface_id) {
+        if (_grh_required) {
             attrs.ah_attr.is_global = 1;
             attrs.ah_attr.grh.dgid = _gid;
             attrs.ah_attr.grh.flow_label = 0;

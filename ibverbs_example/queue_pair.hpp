@@ -75,7 +75,7 @@ namespace rdma
             // of the queue pair. This also applies to post_receive().
 
             ibv_sge sg_list{};
-            sg_list.addr = (std::uintptr_t) _buffer.data();
+            sg_list.addr = (std::uint64_t) _buffer.data();
             sg_list.length = _buffer.size();
             sg_list.lkey = _mr.local_key();
 
@@ -101,7 +101,7 @@ namespace rdma
             // of the queue pair. This also applies to post_receive().
 
             ibv_sge sg_list{};
-            sg_list.addr = (std::uintptr_t) _buffer.data();
+            sg_list.addr = (std::uint64_t) _buffer.data();
             sg_list.length = _buffer.size();
             sg_list.lkey = _mr.local_key();
 

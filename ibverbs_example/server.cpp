@@ -37,7 +37,8 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_port_info(context, port_number);
         std::cout << '\n';
 
-        std::cout << "pkey: " << context.pkey(port_number, 0) << '\n';
+        constexpr auto pkey_index = 0;
+        std::cout << "pkey: " << context.pkey(port_number, pkey_index) << '\n';
         std::cout << '\n';
 
         rdma::protection_domain pd{context};
@@ -91,7 +92,7 @@ auto main(int _argc, char* _argv[]) -> int
         std::cout << '\n';
 
         constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
-        rdma::change_queue_pair_state_to_init(qp, port_number, 0, access_flags);
+        rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
 
         // This is not necessary for initialization. Memory Regions can be registered at
         // any time following initialization.

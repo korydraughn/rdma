@@ -212,11 +212,8 @@ namespace rdma
                 throw std::runtime_error{"connect_queue_pairs server error"};
             }
 
-            stream >> _data;
-            stream.flush();
-
-            stream << _data;
-            stream.flush();
+            stream.read((char*) &_data, sizeof(int));
+            stream.write((char*) &_data, sizeof(int));
         }
         else {
             tcp::iostream stream{_host, _port};
@@ -224,11 +221,8 @@ namespace rdma
             if (!stream)
                 throw std::runtime_error{"connect_queue_pairs client error"};
 
-            stream << _data;
-            stream.flush();
-
-            stream >> _data;
-            stream.flush();
+            stream.write((char*) &_data, sizeof(int));
+            stream.read((char*) &_data, sizeof(int));
         }
 
         std::cout << "done!\n";

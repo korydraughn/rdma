@@ -127,6 +127,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::change_queue_pair_state_to_rts(qp, sq_psn);
 
+        std::cout << '\n';
         rdma::sync_client_and_server(host, port, run_server, rdma::generate_random_int());
 
         std::cout << '\n';

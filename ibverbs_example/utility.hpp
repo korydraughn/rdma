@@ -44,7 +44,7 @@ namespace rdma
                                          int _pkey_index,
                                          int _access_flags) -> void
     {
-        std::cout << "Changing QP state to INIT\n";
+        std::cout << "Changing QP state to INIT ...\n";
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_INIT;
@@ -68,7 +68,7 @@ namespace rdma
                                         std::uint8_t _gid_index,
                                         bool _grh_required) -> void
     {
-        std::cout << "Changing QP state to RTR\n";
+        std::cout << "Changing QP state to RTR ...\n";
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
@@ -87,7 +87,7 @@ namespace rdma
             attrs.ah_attr.grh.dgid = _remote_info.gid;
             attrs.ah_attr.grh.flow_label = 0;
             attrs.ah_attr.grh.hop_limit = 1;
-            attrs.ah_attr.grh.sgid_index = 0;//_gid_index;
+            attrs.ah_attr.grh.sgid_index = _gid_index; //0;
             attrs.ah_attr.grh.traffic_class = 0;
         }
 
@@ -106,7 +106,7 @@ namespace rdma
     inline
     auto change_queue_pair_state_to_rts(queue_pair& _qp, std::uint32_t _sq_psn) -> void
     {
-        std::cout << "Changing QP state to RTS\n";
+        std::cout << "Changing QP state to RTS ...\n";
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTS;
@@ -187,6 +187,42 @@ namespace rdma
 
         _qp_info.qp_num = ntohl(_qp_info.qp_num);
         _qp_info.lid = ntohs(_qp_info.lid);
+    }
+
+    inline auto sync_client_and_server(bool _is_server, int _data) -> void
+    {
+        using tcp = boost::asio::ip::tcp;
+
+        std::cout << "Syncing client and server ... ";
+
+        if (_is_server) {
+            boost::asio::io_service io_service;
+
+            tcp::endpoint endpoint(tcp::v4(), std::stoi(_port));
+            tcp::acceptor acceptor{io_service, endpoint};
+
+            tcp::iostream stream;
+            boost::system::error_code ec;
+            acceptor.accept(*stream.rdbuf(), ec);
+
+            if (ec) {
+                throw std::runtime_error{"connect_queue_pairs server error"};
+            }
+
+            stream >> _data;
+            stream << _data;
+        }
+        else {
+            tcp::iostream stream{_host, _port};
+
+            if (!stream)
+                throw std::runtime_error{"connect_queue_pairs client error"};
+
+            stream << _data;
+            stream >> _data;
+        }
+
+        std::cout << "done!\n";
     }
 
     inline

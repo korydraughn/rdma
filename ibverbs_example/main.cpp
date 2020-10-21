@@ -84,7 +84,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();
-        qp_info.rq_psn = 0;//sq_psn;
+        qp_info.rq_psn = sq_psn;
         qp_info.lid = port_info.lid;
         qp_info.gid = context.gid(port_number, gid_index);
 
@@ -100,35 +100,42 @@ auto main(int _argc, char* _argv[]) -> int
         // This is required so that the QPs can be transistioned through the proper
         // states and connected for data communication.
         rdma::exchange_queue_pair_info(host, port, qp_info, run_server);
+        std::cout << '\n';
 
         rdma::print_queue_pair_info(qp_info, !local_info);
         std::cout << '\n';
 
-        // Change the QP's state to RTS.
         constexpr auto access_flags = 0;//IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
         rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
-
-        const auto grh_required = (port_info.flags & IBV_QPF_GRH_REQUIRED) == IBV_QPF_GRH_REQUIRED;
-        rdma::change_queue_pair_state_to_rtr(qp, qp_info, port_number, gid_index, grh_required);
-
-        rdma::change_queue_pair_state_to_rts(qp, sq_psn);
-
-        std::cout << '\n';
-        const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
-        rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
-        std::cout << '\n';
 
         // Memory Regions can be registered at any time. However, doing this in the
         // data path could negatively affect performance.
         std::vector<std::uint8_t> buffer(128);
         rdma::memory_region mr{pd, buffer, access_flags};
 
+        // The client is responsible for driving the conversation with the server.
+        // If we are running as a server, then post a receive request. RDMA requires that the responder
+        // posts a receive work request before the sender actually posts the send request.
+        if (run_server) {
+            std::cout << "Posting receive request ... ";
+            qp.post_receive(buffer, mr);
+            std::cout << "done!\n";
+        }
+
+        const auto grh_required = (port_info.flags & IBV_QPF_GRH_REQUIRED) == IBV_QPF_GRH_REQUIRED;
+        rdma::change_queue_pair_state_to_rtr(qp, qp_info, port_number, gid_index, grh_required);
+
+        rdma::change_queue_pair_state_to_rts(qp, sq_psn);
+
+        rdma::sync_client_and_server(run_server, rdma::generate_random_int());
+
+        std::cout << '\n';
+        const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);
+        rdma::print_queue_pair_attributes(qp_attrs, q_attrs);
+        std::cout << '\n';
+
         if (!vm["skip-rdma"].as<bool>()) {
             if (run_server) {
-                std::cout << "Posting receive request ... ";
-                qp.post_receive(buffer, mr);
-                std::cout << "done!\n";
-
                 std::cout << "Waiting for completion ... ";
                 const auto wc = qp.wait_for_completion();
                 std::cout << "done!\n";

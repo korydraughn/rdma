@@ -95,18 +95,16 @@ auto main(int _argc, char* _argv[]) -> int
         qp_info.lid = port_info.lid;
         qp_info.gid = context.gid(port_number, gid_index);
 
-        std::cout << "Client Queue Pair Info\n";
-        std::cout << "----------------------\n";
-        rdma::print_queue_pair_info(qp_info);
+        const auto run_server = vm["server"].as<bool>();
+        rdma::print_queue_pair_info(qp_info, run_server);
         std::cout << '\n';
 
         const auto host = vm["host"].as<std::string>();
         const auto port = vm["port"].as<std::string>();
-        const auto run_server = vm["server"].as<bool>();
 
         rdma::exchange_queue_pair_info(host, port, qp_info, run_server);
 
-        rdma::print_queue_pair_info(qp_info, run_server);
+        rdma::print_queue_pair_info(qp_info, !run_server);
         std::cout << '\n';
 
         constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;

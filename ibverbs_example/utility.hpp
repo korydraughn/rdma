@@ -55,10 +55,7 @@ namespace rdma
 
     inline
     auto change_queue_pair_state_to_rtr(queue_pair& _qp,
-                                        std::uint32_t _dest_qp_num,
-                                        std::uint32_t _rq_psn,
-                                        std::uint8_t _lid,
-                                        const ibv_gid& _gid,
+                                        const queue_pair_info& _remote_info,
                                         std::uint8_t _port_number,
                                         std::uint8_t _gid_index,
                                         bool _grh_required) -> void
@@ -67,22 +64,22 @@ namespace rdma
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
-        attrs.path_mtu = IBV_MTU_1024;
-        attrs.dest_qp_num = _dest_qp_num;
-        attrs.rq_psn = _rq_psn;
+        attrs.path_mtu = IBV_MTU_4096;
+        attrs.dest_qp_num = _remote_info.qp_num;
+        attrs.rq_psn = _remote_info.rq_psn;
         attrs.max_dest_rd_atomic = 1;
         attrs.min_rnr_timer = 12;
-        attrs.ah_attr.dlid = _lid;
+        attrs.ah_attr.dlid = _remote_info.lid;
         attrs.ah_attr.sl = 0;
         attrs.ah_attr.src_path_bits = 0;
         attrs.ah_attr.port_num = _port_number;
 
         if (_grh_required) {
             attrs.ah_attr.is_global = 1;
-            attrs.ah_attr.grh.dgid = _gid;
+            attrs.ah_attr.grh.dgid = _remote_info.gid;
             attrs.ah_attr.grh.flow_label = 0;
             attrs.ah_attr.grh.hop_limit = 1;
-            attrs.ah_attr.grh.sgid_index = _gid_index;
+            attrs.ah_attr.grh.sgid_index = 0;//_gid_index;
             attrs.ah_attr.grh.traffic_class = 0;
         }
 
@@ -113,10 +110,10 @@ namespace rdma
 
         const auto props = (IBV_QP_STATE |
                             IBV_QP_SQ_PSN |
-                            IBV_QP_MAX_QP_RD_ATOMIC |
+                            IBV_QP_TIMEOUT |
                             IBV_QP_RETRY_CNT |
                             IBV_QP_RNR_RETRY |
-                            IBV_QP_TIMEOUT);
+                            IBV_QP_MAX_QP_RD_ATOMIC);
 
         _qp.modify_attribute(attrs, props);
         std::cout << "QP state changed successfully!\n";
@@ -192,7 +189,7 @@ namespace rdma
             case IBV_PORT_ARMED:        return "IBV_PORT_ARMED";
             case IBV_PORT_ACTIVE:       return "IBV_PORT_ACTIVE";
             case IBV_PORT_ACTIVE_DEFER: return "IBV_PORT_ACTIVE_DEFER";
-            default:                    return "???";
+            default:                    return "?";
         }
     }
 
@@ -205,7 +202,7 @@ namespace rdma
             case IBV_MTU_1024: return "IBV_MTU_1024";
             case IBV_MTU_2048: return "IBV_MTU_2048";
             case IBV_MTU_4096: return "IBV_MTU_4096";
-            default:           return "???";
+            default:           return "?";
         }
     }
 

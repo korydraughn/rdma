@@ -84,7 +84,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();
-        qp_info.rq_psn = sq_psn;
+        qp_info.rq_psn = 0;//sq_psn;
         qp_info.lid = port_info.lid;
         qp_info.gid = context.gid(port_number, gid_index);
 
@@ -105,18 +105,11 @@ auto main(int _argc, char* _argv[]) -> int
         std::cout << '\n';
 
         // Change the QP's state to RTS.
-        constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+        constexpr auto access_flags = 0;//IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
         rdma::change_queue_pair_state_to_init(qp, port_number, pkey_index, access_flags);
 
         const auto grh_required = (port_info.flags & IBV_QPF_GRH_REQUIRED) == IBV_QPF_GRH_REQUIRED;
-        rdma::change_queue_pair_state_to_rtr(qp,
-                                             qp_info.qp_num,
-                                             qp_info.rq_psn,
-                                             qp_info.lid,
-                                             qp_info.gid,
-                                             port_number,
-                                             gid_index,
-                                             grh_required);
+        rdma::change_queue_pair_state_to_rtr(qp, qp_info, port_number, gid_index, grh_required);
 
         rdma::change_queue_pair_state_to_rts(qp, sq_psn);
 

@@ -118,7 +118,7 @@ auto main(int _argc, char* _argv[]) -> int
             std::cout << '\n';
         }
 
-        const auto wc = qp.wait_for_work_completion();
+        const auto wc = qp.wait_for_completion();
         std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
         if (wc.status == IBV_WC_SUCCESS) {

@@ -123,7 +123,7 @@ auto main(int _argc, char* _argv[]) -> int
         std::copy(msg, msg + strlen(msg), buffer.data() + (grh_required ? 40 : 0));
         rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
         qp.post_send(buffer, mr);
-        const auto wc = qp.wait_for_work_completion();
+        const auto wc = qp.wait_for_completion();
         std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
 
         if (wc.status == IBV_WC_SUCCESS)

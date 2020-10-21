@@ -117,7 +117,7 @@ namespace rdma
             }
         }
 
-        auto wait_for_work_completion() -> ibv_wc
+        auto wait_for_completion() -> ibv_wc
         {
             int n_comp = 0;
             ibv_wc wc{};

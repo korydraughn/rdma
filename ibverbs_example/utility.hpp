@@ -64,7 +64,7 @@ namespace rdma
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
-        attrs.path_mtu = IBV_MTU_4096;
+        attrs.path_mtu = IBV_MTU_512;
         attrs.dest_qp_num = _remote_info.qp_num;
         attrs.rq_psn = _remote_info.rq_psn;
         attrs.max_dest_rd_atomic = 1;

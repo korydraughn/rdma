@@ -189,11 +189,14 @@ namespace rdma
         _qp_info.lid = ntohs(_qp_info.lid);
     }
 
-    inline auto sync_client_and_server(bool _is_server, int _data) -> void
+    inline auto sync_client_and_server(const std::string& _host,
+                                       const std::string& _port,
+                                       bool _is_server,
+                                       int _data) -> void
     {
         using tcp = boost::asio::ip::tcp;
 
-        std::cout << "Syncing client and server ... ";
+        std::cout << "Syncing client and server [" << _data << "] ... ";
 
         if (_is_server) {
             boost::asio::io_service io_service;

@@ -127,7 +127,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         rdma::change_queue_pair_state_to_rts(qp, sq_psn);
 
-        rdma::sync_client_and_server(run_server, rdma::generate_random_int());
+        rdma::sync_client_and_server(host, port, run_server, rdma::generate_random_int());
 
         std::cout << '\n';
         const auto [qp_attrs, q_attrs] = qp.query_attribute(IBV_QP_RQ_PSN | IBV_QP_AV);

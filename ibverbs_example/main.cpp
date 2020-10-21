@@ -2,6 +2,7 @@
 
 #include <infiniband/verbs.h>
 
+#include <boost/program_options.hpp>
 #include <boost/asio.hpp>
 
 #include <cstdint>
@@ -14,14 +15,28 @@
 #include <iterator>
 #include <algorithm>
 
+namespace po = boost::program_options;
+
 auto main(int _argc, char* _argv[]) -> int
 {
-    if (_argc != 4) {
-        std::cout << "USAGE: client <host> <port> <gid_index>\n";
-        return 1;
-    }
-
     try {
+        po::options_description desc{"Options"};
+        desc.add_options()
+            ("server,s", po::bool_switch(), "Launches server.")
+            ("host,h", po::value<std::string>(), "The host to connect to.")
+            ("port,p", po::value<int>()->default_value(9900), "The port to connect to.")
+            ("gid-index,g", po::value<int>()->default_value(0), "The index of the GID to use.")
+            ("help,h", po::bool_switch(), "Show this message.");
+
+        po::variables_map vm;
+        po::store(po::parse_command_line(desc, _argc, _argv), vm);
+        po::notify(vm);
+
+        if (vm["help"].as<bool>()) {
+            std::cout << desc << '\n';
+            return 0;
+        }
+
         rdma::device_list devices;
         std::cout << "Number of RDMA devices: " << devices.size() << '\n';
         std::cout << '\n';
@@ -72,7 +87,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         const auto sq_psn = rdma::generate_random_int();
         const auto port_info = context.port_info(port_number);
-        const auto gid_index = std::stoi(_argv[3]);
+        const auto gid_index = std::stoi(vm["gid-index"].as<int>());
 
         rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();
@@ -85,14 +100,13 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_queue_pair_info(qp_info);
         std::cout << '\n';
 
-        const auto* host = _argv[1];
-        const auto* port = _argv[2];
-        constexpr auto is_server = false;
-        rdma::exchange_queue_pair_info(host, port, qp_info, is_server);
+        const auto host = vm["host"].as<std::string>();
+        const auto port = vm["port"].as<std::string>();
+        const auto run_server = vm["server"].as<bool>();
 
-        std::cout << "Server Queue Pair Info\n";
-        std::cout << "----------------------\n";
-        rdma::print_queue_pair_info(qp_info);
+        rdma::exchange_queue_pair_info(host, port, qp_info, run_server);
+
+        rdma::print_queue_pair_info(qp_info, run_server);
         std::cout << '\n';
 
         constexpr auto access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
@@ -117,20 +131,40 @@ auto main(int _argc, char* _argv[]) -> int
             std::cout << '\n';
         }
 
-        // This is not necessary for initialization. Memory Regions can be registered at
-        // any time following initialization.
+        // Memory Regions can be registered at any time. However, doing this in the
+        // data path could negatively affect performance.
         std::vector<std::uint8_t> buffer(128);
-        const char msg[] = "This was sent from the client!";
-        std::copy(msg, msg + strlen(msg), buffer.data() + (grh_required ? 40 : 0));
-        rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
-        qp.post_send(buffer, mr);
-        const auto wc = qp.wait_for_completion();
-        std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
+        //rdma::memory_region mr{pd, buffer, IBV_ACCESS_LOCAL_WRITE};
+        rdma::memory_region mr{pd, buffer, access_flags};
 
-        if (wc.status == IBV_WC_SUCCESS)
-            std::cout << "Message sent!\n";
-        else
-            std::cout << "Could not send message.\n";
+        if (run_server) {
+            qp.post_receive(buffer, mr);
+
+            const auto wc = qp.wait_for_completion();
+            std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
+
+            if (wc.status == IBV_WC_SUCCESS) {
+                std::cout << "Message received: ";
+                std::cout.write((char*) buffer.data(), buffer.size());
+                std::cout << '\n';
+            }
+            else {
+                std::cout << "Error receiving message.\n";
+            }
+        }
+        else {
+            const char msg[] = "This was sent from the client!";
+            std::copy(msg, msg + strlen(msg), buffer.data() + (grh_required ? 40 : 0));
+            qp.post_send(buffer, mr);
+
+            const auto wc = qp.wait_for_completion();
+            std::cout << "WC Status: " << ibv_wc_status_str(wc.status) << ", Code: " << wc.status << '\n';
+
+            if (wc.status == IBV_WC_SUCCESS)
+                std::cout << "Message sent!\n";
+            else
+                std::cout << "Could not send message.\n";
+        }
 
         return 0;
     }

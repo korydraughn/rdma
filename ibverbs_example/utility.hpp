@@ -254,8 +254,8 @@ namespace rdma
 
     auto print_queue_pair_attributes(const ibv_qp_attr& _qp_attrs, const ibv_qp_init_attr& _qp_init_attrs) -> void
     {
-        std::cout << "Queue Pair Info\n";
-        std::cout << "---------------\n";
+        std::cout << "Queue Pair Attributes\n";
+        std::cout << "---------------------\n";
         std::cout << "pkey index        : " << _qp_attrs.pkey_index << '\n';
         std::cout << "qp port           : " << (int) _qp_attrs.port_num << '\n';
         std::cout << "q key             : " << _qp_attrs.qkey << '\n';
@@ -271,8 +271,17 @@ namespace rdma
         std::cout << "max inline data   : " << _qp_attrs.cap.max_inline_data << '\n';
     }
 
-    auto print_queue_pair_info(const queue_pair_info& _qpi) -> void
+    auto print_queue_pair_info(const queue_pair_info& _qpi, bool _run_server) -> void
     {
+        if (_run_server) {
+            std::cout << "Local Queue Pair Information\n";
+            std::cout << "----------------------------\n";
+        }
+        else {
+            std::cout << "Remote Queue Pair Information\n";
+            std::cout << "-----------------------------\n";
+        }
+
         std::cout << "qp_num: " << _qpi.qp_num << '\n';
         std::cout << "rq_psn: " << _qpi.rq_psn << '\n';
         std::cout << "lid   : " << _qpi.lid << '\n';

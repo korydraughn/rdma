@@ -29,7 +29,7 @@ auto main(int _argc, char* _argv[]) -> int
             ("help,h", po::bool_switch(), "Show this message.");
 
         po::variables_map vm;
-        po::store(po::parse_command_line(desc, _argc, _argv), vm);
+        po::store(po::parse_command_line(_argc, _argv, desc), vm);
         po::notify(vm);
 
         if (vm["help"].as<bool>()) {
@@ -87,7 +87,7 @@ auto main(int _argc, char* _argv[]) -> int
 
         const auto sq_psn = rdma::generate_random_int();
         const auto port_info = context.port_info(port_number);
-        const auto gid_index = std::stoi(vm["gid-index"].as<int>());
+        const auto gid_index = vm["gid-index"].as<int>();
 
         rdma::queue_pair_info qp_info{};
         qp_info.qp_num = qp.queue_pair_number();

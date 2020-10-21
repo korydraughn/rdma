@@ -23,7 +23,7 @@ auto main(int _argc, char* _argv[]) -> int
         po::options_description desc{"Options"};
         desc.add_options()
             ("server,s", po::bool_switch(), "Launches server.")
-            ("host,h", po::value<std::string>(), "The host to connect to.")
+            ("host,h", po::value<std::string>(), "The host to connect to. Ignored if -s is used.")
             ("port,p", po::value<std::string>()->default_value("9900"), "The port to connect to.")
             ("gid-index,g", po::value<int>()->default_value(0), "The index of the GID to use.")
             ("help,h", po::bool_switch(), "Show this message.");
@@ -99,7 +99,7 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_queue_pair_info(qp_info, run_server);
         std::cout << '\n';
 
-        const auto host = vm["host"].as<std::string>();
+        const auto host = run_server ? "" : vm["host"].as<std::string>();
         const auto port = vm["port"].as<std::string>();
 
         rdma::exchange_queue_pair_info(host, port, qp_info, run_server);

@@ -52,11 +52,11 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::print_device_info(context);
         std::cout << '\n';
 
-        constexpr auto port_number = 1;
+        constexpr auto port_number = 1; // Normally one (1).
         rdma::print_port_info(context, port_number);
         std::cout << '\n';
 
-        constexpr auto pkey_index = 0;
+        constexpr auto pkey_index = 0; // Normally zero (0).
         std::cout << "pkey: " << context.pkey(port_number, pkey_index) << '\n';
         std::cout << '\n';
 
@@ -65,6 +65,7 @@ auto main(int _argc, char* _argv[]) -> int
         constexpr auto cqe_size = 1;
         rdma::completion_queue cq{cqe_size, context};
 
+        // Configure and create a queue pair (QP).
         ibv_qp_init_attr qp_init_attrs{};
         qp_init_attrs.qp_type = IBV_QPT_RC;
         qp_init_attrs.sq_sig_all = 1; // Each SR will produce a WC.
@@ -102,6 +103,10 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::exchange_queue_pair_info(host, port, qp_info, run_server);
         std::cout << '\n';
 
+        // Transition the QP's state from IBV_QPS_INIT to IBV_QPS_RTS.
+        // If a QP will only process receive requests, then that QP only needs to be
+        // transitioned to the IBV_QPS_RTR state.
+
         rdma::print_queue_pair_info(qp_info, !local_info);
         std::cout << '\n';
 
@@ -126,8 +131,11 @@ auto main(int _argc, char* _argv[]) -> int
         rdma::change_queue_pair_state_to_rtr(qp, qp_info, port_number, gid_index, grh_required);
 
         rdma::change_queue_pair_state_to_rts(qp, sq_psn);
-
         std::cout << '\n';
+
+        // Echo a message between the sender and responder. This call acts as a point of
+        // synchronization between the sender and responder and guarantees that each side's
+        // QP is up and ready for processing.
         rdma::sync_client_and_server(host, port, run_server, rdma::generate_random_int());
 
         std::cout << '\n';

@@ -38,18 +38,25 @@ namespace rdma
         ibv_gid gid;
     };
 
-    inline
-    auto change_queue_pair_state_to_init(queue_pair& _qp,
-                                         std::uint8_t _port_number,
-                                         int _pkey_index,
-                                         int _access_flags) -> void
+    // Once the QP has been transitioned to this state, the user may post receive
+    // requests. At least one receive buffer should be posted before transitioning
+    // the QP to the RTR state. However, this implies the completion queue used by
+    // the QP should be dedicated to handling receive completions or be large enough
+    // to hold at least two completions (one for sends and one for receives).
+    inline auto change_queue_pair_state_to_init(queue_pair& _qp,
+                                                std::uint8_t _port_number,
+                                                int _pkey_index,
+                                                int _access_flags) -> void
     {
         std::cout << "Changing QP state to INIT ...\n";
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_INIT;
-        attrs.pkey_index = _pkey_index;
+        attrs.pkey_index = _pkey_index; // Normally zero (0).
         attrs.port_num = _port_number;
+
+        // Must be inline with the access flags set on the memory regions used
+        // by this QP. See ibv_reg_mr.
         attrs.qp_access_flags = _access_flags;
 
         const auto props = (IBV_QP_STATE |
@@ -61,22 +68,24 @@ namespace rdma
         std::cout << "QP state changed successfully!\n";
     }
 
-    inline
-    auto change_queue_pair_state_to_rtr(queue_pair& _qp,
-                                        const queue_pair_info& _remote_info,
-                                        std::uint8_t _port_number,
-                                        std::uint8_t _gid_index,
-                                        bool _grh_required) -> void
+    // Requires at least one receive buffer be posted before transitioning
+    // the QP to the RTR state. Once the QP is transitioned to this state, it begins
+    // receive processing.
+    inline auto change_queue_pair_state_to_rtr(queue_pair& _qp,
+                                               const queue_pair_info& _remote_info,
+                                               std::uint8_t _port_number,
+                                               std::uint8_t _gid_index,
+                                               bool _grh_required) -> void
     {
         std::cout << "Changing QP state to RTR ...\n";
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTR;
-        attrs.path_mtu = IBV_MTU_1024;
+        attrs.path_mtu = IBV_MTU_512; // Recommended value.
         attrs.dest_qp_num = _remote_info.qp_num;
-        attrs.rq_psn = _remote_info.rq_psn;
+        attrs.rq_psn = _remote_info.rq_psn; // This should match the remote QP's sq_psn.
         attrs.max_dest_rd_atomic = 1;
-        attrs.min_rnr_timer = 18;
+        attrs.min_rnr_timer = 12; // Recommended value.
         attrs.ah_attr.dlid = _remote_info.lid;
         attrs.ah_attr.sl = 0;
         attrs.ah_attr.src_path_bits = 0;
@@ -103,24 +112,25 @@ namespace rdma
         std::cout << "QP state changed successfully!\n";
     }
 
-    inline
-    auto change_queue_pair_state_to_rts(queue_pair& _qp, std::uint32_t _sq_psn) -> void
+    // Once the QP is transitioned to this state, it begins send processing and is fully
+    // operational. The user can now post send requests.
+    inline auto change_queue_pair_state_to_rts(queue_pair& _qp, std::uint32_t _sq_psn) -> void
     {
         std::cout << "Changing QP state to RTS ...\n";
         ibv_qp_attr attrs{};
 
         attrs.qp_state = IBV_QPS_RTS;
-        attrs.sq_psn = _sq_psn;
-        attrs.timeout = 20;
-        attrs.retry_cnt = 7;
-        attrs.rnr_retry = 7;
+        attrs.timeout = 14; // Recommended value.
+        attrs.retry_cnt = 7; // Recommended value.
+        attrs.rnr_retry = 7; // Recommended value.
+        attrs.sq_psn = _sq_psn; // Should match the remote QP's rq_psn.
         attrs.max_rd_atomic = 1;
 
         const auto props = (IBV_QP_STATE |
-                            IBV_QP_SQ_PSN |
                             IBV_QP_TIMEOUT |
                             IBV_QP_RETRY_CNT |
                             IBV_QP_RNR_RETRY |
+                            IBV_QP_SQ_PSN |
                             IBV_QP_MAX_QP_RD_ATOMIC);
 
         _qp.modify_attribute(attrs, props);
